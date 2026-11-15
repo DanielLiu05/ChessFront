@@ -1,0 +1,224 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://editor/map_editor_controller.gd" id="1_controller"]
+[ext_resource type="Script" path="res://editor/map_editor_board.gd" id="2_board"]
+
+[node name="MapEditor" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_controller")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="Layout" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Toolbar" type="HBoxContainer" parent="MarginContainer/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NewButton" type="Button" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "New"
+
+[node name="OpenButton" type="Button" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Open"
+
+[node name="SaveButton" type="Button" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Save"
+
+[node name="ExportButton" type="Button" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Export"
+
+[node name="ValidateButton" type="Button" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Validate"
+
+[node name="IdLabel" type="Label" parent="MarginContainer/Layout/Toolbar"]
+layout_mode = 2
+text = "ID"
+
+[node name="IdEdit" type="LineEdit" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "map_id"
+
+[node name="NameLabel" type="Label" parent="MarginContainer/Layout/Toolbar"]
+layout_mode = 2
+text = "Name"
+
+[node name="NameEdit" type="LineEdit" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Map Name"
+
+[node name="StatusLabel" type="Label" parent="MarginContainer/Layout/Toolbar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Ready"
+text_overrun_behavior = 3
+
+[node name="Content" type="HBoxContainer" parent="MarginContainer/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="Tools" type="VBoxContainer" parent="MarginContainer/Layout/Content"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="TerrainLabel" type="Label" parent="MarginContainer/Layout/Content/Tools"]
+layout_mode = 2
+text = "Terrain"
+
+[node name="GroundButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Ground"
+
+[node name="ForestButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Forest"
+
+[node name="HillButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Hill"
+
+[node name="WaterButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Water"
+
+[node name="MineButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Toggle Mine"
+
+[node name="UnitsLabel" type="Label" parent="MarginContainer/Layout/Content/Tools"]
+layout_mode = 2
+text = "Starting units"
+
+[node name="OwnerOption" type="OptionButton" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="KingButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "King"
+
+[node name="QueenButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Queen"
+
+[node name="RookButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Rook"
+
+[node name="BishopButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Bishop"
+
+[node name="KnightButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Knight"
+
+[node name="PawnButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pawn"
+
+[node name="RemoveUnitButton" type="Button" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Remove Unit"
+
+[node name="ToolLabel" type="Label" parent="MarginContainer/Layout/Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Tool: paint Ground"
+autowrap_mode = 2
+
+[node name="Board" type="Control" parent="MarginContainer/Layout/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(480, 480)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("2_board")
+
+[node name="ValidationPanel" type="VBoxContainer" parent="MarginContainer/Layout/Content"]
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ValidationLabel" type="Label" parent="MarginContainer/Layout/Content/ValidationPanel"]
+layout_mode = 2
+text = "Validation"
+
+[node name="IssuesList" type="ItemList" parent="MarginContainer/Layout/Content/ValidationPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="OpenDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+title = "Open Map"
+size = Vector2i(800, 600)
+ok_button_text = "Open"
+file_mode = 0
+access = 2
+
+[node name="SaveDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+title = "Save Draft"
+size = Vector2i(800, 600)
+ok_button_text = "Save"
+file_mode = 3
+access = 2
+
+[node name="ExportDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+title = "Export Map"
+size = Vector2i(800, 600)
+ok_button_text = "Export"
+file_mode = 3
+access = 2
+
+[node name="MessageDialog" type="AcceptDialog" parent="."]
+unique_name_in_owner = true
+title = "Map Editor"
+size = Vector2i(520, 240)

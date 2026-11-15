@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MatchModeDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/match/match_mode_definition.gd" id="1_mode"]
+
+[resource]
+script = ExtResource("1_mode")
+id = "vs_ai"
+display_name = "Play vs AI"
+description = "Command one army against a basic deterministic AI opponent."
+opponent_kind = 0
+enabled = true

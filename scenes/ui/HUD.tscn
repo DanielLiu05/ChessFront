@@ -1,0 +1,398 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+
+[node name="HUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_hud")
+
+[node name="TopBar" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = 96.0
+grow_horizontal = 2
+
+[node name="Layout" type="VBoxContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Bar" type="HBoxContainer" parent="TopBar/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TurnLabel" type="Label" parent="TopBar/Layout/Bar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Your turn — Player 1"
+theme_override_font_sizes/font_size = 18
+
+[node name="PlyLabel" type="Label" parent="TopBar/Layout/Bar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Ply 0 / 120"
+theme_override_font_sizes/font_size = 18
+
+[node name="GoldLabel" type="Label" parent="TopBar/Layout/Bar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Gold  P1 0 · P2 0"
+theme_override_font_sizes/font_size = 18
+
+[node name="IncomeLabel" type="Label" parent="TopBar/Layout/Bar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Mines 0"
+theme_override_font_sizes/font_size = 18
+
+[node name="StatusBar" type="HBoxContainer" parent="TopBar/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StatusLabel" type="Label" parent="TopBar/Layout/StatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Ready."
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 15
+
+[node name="ReturnSetupButton" type="Button" parent="TopBar/Layout/StatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Return to Setup"
+
+[node name="HelpButton" type="Button" parent="TopBar/Layout/StatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Help"
+
+[node name="LeftPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+offset_left = 12.0
+offset_top = 108.0
+offset_right = 288.0
+offset_bottom = 430.0
+
+[node name="Layout" type="VBoxContainer" parent="LeftPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Heading" type="Label" parent="LeftPanel/Layout"]
+layout_mode = 2
+text = "Selected Unit"
+theme_override_font_sizes/font_size = 18
+
+[node name="UnitInfoLabel" type="Label" parent="LeftPanel/Layout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+text = "No unit selected."
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 15
+
+[node name="Separator" type="HSeparator" parent="LeftPanel/Layout"]
+layout_mode = 2
+
+[node name="PassButton" type="Button" parent="LeftPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pass"
+
+[node name="BuildBridgeButton" type="Button" parent="LeftPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Build Bridge"
+
+[node name="DestroyBridgeButton" type="Button" parent="LeftPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Destroy Bridge"
+
+[node name="CancelActionButton" type="Button" parent="LeftPanel/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Cancel Mode"
+
+[node name="DrawPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 440.0
+offset_right = 288.0
+offset_bottom = -12.0
+grow_vertical = 0
+
+[node name="Layout" type="VBoxContainer" parent="DrawPanel"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Heading" type="Label" parent="DrawPanel/Layout"]
+layout_mode = 2
+text = "Draw"
+theme_override_font_sizes/font_size = 18
+
+[node name="DrawStatusLabel" type="Label" parent="DrawPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "No draw offer."
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 14
+
+[node name="OfferDrawButton" type="Button" parent="DrawPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Offer Draw"
+
+[node name="AcceptDrawButton" type="Button" parent="DrawPanel/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Accept Draw"
+
+[node name="DeclineDrawButton" type="Button" parent="DrawPanel/Layout"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Decline Draw"
+
+[node name="RightPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -250.0
+offset_top = 108.0
+offset_right = -12.0
+offset_bottom = 430.0
+grow_horizontal = 0
+
+[node name="Layout" type="VBoxContainer" parent="RightPanel"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="Heading" type="Label" parent="RightPanel/Layout"]
+layout_mode = 2
+text = "Recruit"
+theme_override_font_sizes/font_size = 18
+
+[node name="RecruitPawnButton" type="Button" parent="RightPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Pawn (1)"
+
+[node name="RecruitScoutButton" type="Button" parent="RightPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Scout (2)"
+
+[node name="RecruitKnightButton" type="Button" parent="RightPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Knight (3)"
+
+[node name="RecruitBishopButton" type="Button" parent="RightPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Bishop (4)"
+
+[node name="RecruitEngineerButton" type="Button" parent="RightPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Engineer (4)"
+
+[node name="RecruitRookButton" type="Button" parent="RightPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Rook (5)"
+
+[node name="LogPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -250.0
+offset_top = 440.0
+offset_right = -12.0
+offset_bottom = -12.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="Layout" type="VBoxContainer" parent="LogPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Heading" type="Label" parent="LogPanel/Layout"]
+layout_mode = 2
+text = "Action Log"
+theme_override_font_sizes/font_size = 18
+
+[node name="LogLabel" type="Label" parent="LogPanel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+text = "No actions yet."
+autowrap_mode = 2
+max_lines_visible = 8
+theme_override_font_sizes/font_size = 14
+
+[node name="PromotionOverlay" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Backdrop" type="ColorRect" parent="PromotionOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.62)
+mouse_filter = 0
+
+[node name="Center" type="CenterContainer" parent="PromotionOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="PromotionOverlay/Center"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+
+[node name="Layout" type="VBoxContainer" parent="PromotionOverlay/Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PromotionLabel" type="Label" parent="PromotionOverlay/Center/Panel/Layout"]
+layout_mode = 2
+text = "Promote pawn to:"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+
+[node name="Buttons" type="HBoxContainer" parent="PromotionOverlay/Center/Panel/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PromoteQueenButton" type="Button" parent="PromotionOverlay/Center/Panel/Layout/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Queen"
+
+[node name="PromoteRookButton" type="Button" parent="PromotionOverlay/Center/Panel/Layout/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Rook"
+
+[node name="PromoteBishopButton" type="Button" parent="PromotionOverlay/Center/Panel/Layout/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Bishop"
+
+[node name="PromoteKnightButton" type="Button" parent="PromotionOverlay/Center/Panel/Layout/Buttons"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Knight"
+
+[node name="PromoteCancelButton" type="Button" parent="PromotionOverlay/Center/Panel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cancel"
+
+[node name="GameOverOverlay" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Backdrop" type="ColorRect" parent="GameOverOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.65)
+mouse_filter = 0
+
+[node name="Center" type="CenterContainer" parent="GameOverOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="GameOverOverlay/Center"]
+custom_minimum_size = Vector2(460, 0)
+layout_mode = 2
+
+[node name="Layout" type="VBoxContainer" parent="GameOverOverlay/Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="GameOverTitle" type="Label" parent="GameOverOverlay/Center/Panel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Game over"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 26
+
+[node name="GameOverDetail" type="Label" parent="GameOverOverlay/Center/Panel/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "The enemy King was captured."
+horizontal_alignment = 1
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 16
+
+[node name="GameOverButtons" type="HBoxContainer" parent="GameOverOverlay/Center/Panel/Layout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="GameOverRematchButton" type="Button" parent="GameOverOverlay/Center/Panel/Layout/GameOverButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Rematch"
+
+[node name="GameOverSetupButton" type="Button" parent="GameOverOverlay/Center/Panel/Layout/GameOverButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Return to Setup"
+
+[node name="HelpDialog" type="AcceptDialog" parent="."]
+unique_name_in_owner = true
+title = "Controls"
+size = Vector2i(520, 300)
+
+[node name="SetupConfirmDialog" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "Return to Setup"
+size = Vector2i(420, 160)
