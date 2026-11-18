@@ -30,8 +30,10 @@ static func _recompute_player(
 		for dy in range(-radius, radius + 1):
 			for dx in range(-radius, radius + 1):
 				var tile := unit.tile + Vector2i(dx, dy)
-				if board.get_tile(tile) != null:
+				var data := board.get_tile(tile)
+				if data != null:
 					knowledge.mark_visible(tile)
+					knowledge.remember_tile(tile, data.terrain, data.elevation, data.has_bridge)
 
 	for enemy: GameUnit in units:
 		if enemy.owner == player:

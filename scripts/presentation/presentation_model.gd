@@ -35,7 +35,9 @@ var pending_promotion_tile: Vector2i = NO_TILE
 var pending_promotion_unit_id: int = -1
 
 var last_result: ActionResult
+var last_action: GameAction
 var action_log: Array[String] = []
+var stats := MatchStats.new()
 
 var _recruitment_type: int = -1
 var _bridge_mode: BridgeMode = BridgeMode.NONE
@@ -194,7 +196,7 @@ func move_selected_to(
 	var result := ActionResolver.resolve(state, action, view.exploration)
 	last_result = result
 	if result.success:
-		_complete_action(action, result)
+		_complete_action(action, result, unit.type)
 	return result
 
 
@@ -205,11 +207,12 @@ func complete_promotion(promotion_type: int) -> ActionResult:
 		return _failure("Invalid promotion choice")
 	var unit_id := pending_promotion_unit_id
 	var destination := pending_promotion_tile
+	var promoted := _known_unit(unit_id)
 	var action := MoveAction.new(unit_id, destination, promotion_type)
 	var result := ActionResolver.resolve(state, action, view.exploration)
 	last_result = result
 	if result.success:
-		_complete_action(action, result)
+		_complete_action(action, result, promoted.type if promoted != null else -1)
 	return result
 
 
@@ -474,15 +477,20 @@ func get_unit_info(unit_id: int) -> Dictionary:
 		return {}
 	var definition := unit.definition()
 	var terrain_name := "Unknown"
+	var terrain_modifier := 0
 	var data := view.board.get_tile(unit.tile)
 	if data != null:
-		terrain_name = TerrainRegistry.get_definition(data.terrain).display_name
+		var terrain_definition := TerrainRegistry.get_definition(data.terrain)
+		terrain_name = terrain_definition.display_name
+		terrain_modifier = int(terrain_definition.vision_modifier)
 	return {
 		"id": unit.id,
 		"type": int(unit.type),
 		"name": definition.display_name,
 		"owner": int(unit.owner),
 		"vision": definition.base_vision,
+		"effective_vision": VisionRules.effective_vision(view.board, unit),
+		"terrain_vision_modifier": terrain_modifier,
 		"can_capture": definition.can_capture,
 		"price": definition.price,
 		"movement_category": int(definition.movement_category),
@@ -504,18 +512,28 @@ func log_entries() -> Array[String]:
 	return action_log.duplicate()
 
 
+func match_stats() -> MatchStats:
+	return stats
+
+
 func append_public_log(message: String) -> void:
 	if not message.is_empty():
 		_append_log(message)
 
 
-func _complete_action(action: GameAction, result: ActionResult) -> void:
+func _complete_action(
+	action: GameAction,
+	result: ActionResult,
+	mover_type: int = -1
+) -> void:
+	last_action = action
 	_clear_selection_state()
 	refresh()
-	_record_action(action, result)
+	_record_action(action, result, mover_type)
 
 
-func _record_action(action: GameAction, result: ActionResult) -> void:
+func _record_action(action: GameAction, result: ActionResult, mover_type: int = -1) -> void:
+	stats.note_result(result, mover_type, local_player)
 	_append_log(action.describe())
 	if result.captured_unit != null:
 		_append_log(

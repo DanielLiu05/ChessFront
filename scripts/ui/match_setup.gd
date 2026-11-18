@@ -11,21 +11,11 @@ enum Page {
 	ONLINE,
 }
 
-const BG_COLOR: Color = Color(0.035, 0.05, 0.075, 1.0)
-const PANEL_COLOR: Color = Color(0.055, 0.075, 0.105, 1.0)
-const PANEL_BORDER: Color = Color(0.18, 0.28, 0.4, 1.0)
-const ACCENT_COLOR: Color = Color(0.45, 0.75, 1.0, 1.0)
-const ERROR_COLOR: Color = Color(1.0, 0.55, 0.45, 1.0)
-const MUTED_COLOR: Color = Color(0.68, 0.76, 0.86, 1.0)
-const TEXT_COLOR: Color = Color(0.9, 0.94, 1.0, 1.0)
-const BUTTON_COLOR: Color = Color(0.08, 0.11, 0.15, 1.0)
-const BUTTON_HOVER_COLOR: Color = Color(0.12, 0.17, 0.23, 1.0)
-const BUTTON_PRESSED_COLOR: Color = Color(0.16, 0.22, 0.3, 1.0)
-const BUTTON_BORDER_COLOR: Color = Color(0.2, 0.3, 0.42, 1.0)
-const MAX_PANEL_WIDTH_DP: float = 520.0
-const MAX_PANEL_HEIGHT_DP: float = 760.0
+const MAX_PANEL_WIDTH_DP: float = 560.0
+const MAX_PANEL_HEIGHT_DP: float = 800.0
 const OUTER_MARGIN_DP: float = 12.0
-const PANEL_MARGIN_DP: float = 16.0
+const PANEL_MARGIN_DP: float = 20.0
+const MAP_ICON_DP: float = 48.0
 
 var _ui_built: bool = false
 var _page: Page = Page.MODE
@@ -50,6 +40,7 @@ var _map_list: VBoxContainer
 var _mode_description: Label
 var _step_label: Label
 var _error_label: Label
+var _orders_values: Dictionary[String, Label] = {}
 var _summary_label: Label
 var _back_button: Button
 var _primary_button: Button
@@ -246,12 +237,7 @@ func _ensure_ui() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var background := ColorRect.new()
-	background.name = "SetupBackground"
-	background.color = BG_COLOR
-	background.mouse_filter = Control.MOUSE_FILTER_STOP
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
+	UiStyle.add_table_background(self)
 
 	_safe_area = SafeAreaContainer.new()
 	_safe_area.name = "SetupSafeArea"
@@ -265,7 +251,7 @@ func _ensure_ui() -> void:
 
 	_panel = PanelContainer.new()
 	_panel.name = "SetupPanel"
-	_style_panel(_panel)
+	UiStyle.style_panel(_panel)
 	_center.add_child(_panel)
 
 	var panel_margin := MarginContainer.new()
@@ -277,33 +263,48 @@ func _ensure_ui() -> void:
 
 	var column := VBoxContainer.new()
 	column.name = "SetupColumn"
-	column.add_theme_constant_override("separation", roundi(_dp(8.0)))
+	column.add_theme_constant_override("separation", roundi(_dp(10.0)))
 	panel_margin.add_child(column)
 
-	var title := _label("Chessfront", 28.0)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(title)
-	var subtitle := _label("Match setup", 14.0)
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_color_override("font_color", MUTED_COLOR)
-	column.add_child(subtitle)
-	_step_label = _label("", 12.0)
+	column.add_child(UiStyle.make_overline("Chessfront"))
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", roundi(_dp(8.0)))
+	column.add_child(title_row)
+	var title := UiStyle.make_display_title("New match", 30.0)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title)
+	var title_rule := UiStyle.make_rule(UiStyle.color("ui_line_soft"))
+	title_rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	title_rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title_rule)
+	_step_label = UiStyle.make_caption("", 11.0)
 	_step_label.name = "SetupStepLabel"
-	_step_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_step_label.add_theme_color_override("font_color", ACCENT_COLOR)
+	_step_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_step_label.add_theme_color_override("font_color", UiStyle.gold())
 	column.add_child(_step_label)
 
 	_mode_page = _build_mode_page()
-	column.add_child(_mode_page)
 	_map_page = _build_map_page()
-	column.add_child(_map_page)
 	_options_page = _build_options_page()
-	column.add_child(_options_page)
+	var pages_scroll := ScrollContainer.new()
+	pages_scroll.name = "SetupPageScroll"
+	pages_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pages_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pages_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	column.add_child(pages_scroll)
+	var pages_box := VBoxContainer.new()
+	pages_box.name = "SetupPages"
+	pages_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pages_box.add_theme_constant_override("separation", 0)
+	pages_scroll.add_child(pages_box)
+	pages_box.add_child(_mode_page)
+	pages_box.add_child(_map_page)
+	pages_box.add_child(_options_page)
 	_online_page = VBoxContainer.new()
 	_online_page.name = "SetupOnlinePage"
-	_online_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_online_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	column.add_child(_online_page)
+	pages_box.add_child(_online_page)
 	_online_panel = OnlineSetupPanel.new()
 	_online_panel.name = "OnlineSetupPanel"
 	_online_panel.back_requested.connect(_on_online_back_requested)
@@ -312,106 +313,156 @@ func _ensure_ui() -> void:
 	if _online_client != null:
 		_online_panel.bind_client(_online_client)
 
-	_error_label = _label("", 12.0)
+	_error_label = UiStyle.make_caption("", 12.0)
 	_error_label.name = "SetupErrorLabel"
-	_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_error_label.add_theme_color_override("font_color", ERROR_COLOR)
+	_error_label.add_theme_color_override("font_color", UiStyle.color("danger"))
 	column.add_child(_error_label)
 
-	var footer := HBoxContainer.new()
-	footer.add_theme_constant_override("separation", roundi(_dp(8.0)))
+	column.add_child(UiStyle.make_rule(UiStyle.color("ui_line_soft")))
+
+	var footer := HFlowContainer.new()
+	footer.add_theme_constant_override("h_separation", roundi(_dp(8.0)))
+	footer.add_theme_constant_override("v_separation", roundi(_dp(6.0)))
 	column.add_child(footer)
 	_back_button = _button("Back", "SetupBackButton", false)
 	_back_button.size_flags_stretch_ratio = 1.0
+	UiStyle.style_quiet_button(_back_button)
 	_back_button.pressed.connect(_on_back_pressed)
 	footer.add_child(_back_button)
 	_primary_button = _button("Continue", "SetupPrimaryButton", true)
 	_primary_button.size_flags_stretch_ratio = 2.0
+	UiStyle.style_primary_button(_primary_button)
 	_primary_button.pressed.connect(_on_primary_pressed)
 	footer.add_child(_primary_button)
 
 	_reload_data()
+	UiStyle.apply_scrollbar_theme(self)
 
 
 func _build_mode_page() -> VBoxContainer:
 	var page := VBoxContainer.new()
 	page.name = "SetupModePage"
-	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	page.add_theme_constant_override("separation", roundi(_dp(8.0)))
-	var heading := _label("Select mode", 18.0)
-	page.add_child(heading)
+	page.add_child(UiStyle.make_overline("Choose a mode"))
 	_mode_list = VBoxContainer.new()
 	_mode_list.name = "SetupModeList"
 	_mode_list.add_theme_constant_override("separation", roundi(_dp(6.0)))
 	page.add_child(_mode_list)
-	_mode_description = _label("", 13.0)
+	_mode_description = UiStyle.make_caption("", 13.0)
 	_mode_description.name = "SetupModeDescription"
-	_mode_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_mode_description.add_theme_color_override("font_color", MUTED_COLOR)
 	page.add_child(_mode_description)
+	page.add_child(_make_note(
+		"Capture the enemy King to win. At the ply limit, or after three repetitions, the match is drawn."
+	))
 	return page
 
 
 func _build_map_page() -> VBoxContainer:
 	var page := VBoxContainer.new()
 	page.name = "SetupMapPage"
-	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	page.add_theme_constant_override("separation", roundi(_dp(8.0)))
-	var heading := _label("Select map", 18.0)
-	page.add_child(heading)
-	var scroll := ScrollContainer.new()
-	scroll.name = "SetupMapScroll"
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	page.add_child(scroll)
+	page.add_child(UiStyle.make_overline("Choose a field"))
 	_map_list = VBoxContainer.new()
 	_map_list.name = "SetupMapList"
 	_map_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_map_list.add_theme_constant_override("separation", roundi(_dp(6.0)))
-	scroll.add_child(_map_list)
+	page.add_child(_map_list)
+	page.add_child(_make_note(
+		"Gold mines pay the side that holds them when a cycle completes. An empty mine leaves a token to collect."
+	))
 	return page
 
 
 func _build_options_page() -> VBoxContainer:
 	var page := VBoxContainer.new()
 	page.name = "SetupOptionsPage"
-	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	page.add_theme_constant_override("separation", roundi(_dp(10.0)))
-	var heading := _label("Side and first move", 18.0)
-	page.add_child(heading)
-	var side_heading := _label("Play as", 14.0)
-	side_heading.add_theme_color_override("font_color", MUTED_COLOR)
+	page.add_child(UiStyle.make_overline("Choose your side"))
+	var side_heading := UiStyle.make_caption("Play as", 12.0)
+	side_heading.add_theme_color_override("font_color", UiStyle.muted())
 	page.add_child(side_heading)
-	var side_row := HBoxContainer.new()
-	side_row.add_theme_constant_override("separation", roundi(_dp(6.0)))
+	var side_row := HFlowContainer.new()
+	side_row.add_theme_constant_override("h_separation", roundi(_dp(6.0)))
+	side_row.add_theme_constant_override("v_separation", roundi(_dp(6.0)))
 	page.add_child(side_row)
 	for player: int in [GameConfig.Player.PLAYER_1, GameConfig.Player.PLAYER_2]:
 		var button := _button("Player %d" % player, "SidePlayer%dButton" % player, false)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.expand_icon = false
+		button.icon = UiStyle.color_swatch(
+			UiStyle.color("player_1")
+			if player == GameConfig.Player.PLAYER_1
+			else UiStyle.color("player_2")
+		)
+		button.add_theme_constant_override("icon_max_width", roundi(_dp(10.0)))
+		button.add_theme_constant_override("h_separation", roundi(_dp(8.0)))
 		button.pressed.connect(select_side.bind(player))
 		_side_buttons[player] = button
 		side_row.add_child(button)
-	var first_heading := _label("First move", 14.0)
-	first_heading.add_theme_color_override("font_color", MUTED_COLOR)
+	var first_heading := UiStyle.make_caption("First move", 12.0)
+	first_heading.add_theme_color_override("font_color", UiStyle.muted())
 	page.add_child(first_heading)
-	var first_row := HBoxContainer.new()
-	first_row.add_theme_constant_override("separation", roundi(_dp(6.0)))
+	var first_row := HFlowContainer.new()
+	first_row.add_theme_constant_override("h_separation", roundi(_dp(6.0)))
+	first_row.add_theme_constant_override("v_separation", roundi(_dp(6.0)))
 	page.add_child(first_row)
-	var human_button := _button("You first", "FirstHumanButton", false)
+	var human_button := _button("You begin", "FirstHumanButton", false)
 	human_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	human_button.pressed.connect(select_first_move.bind(true))
 	_first_buttons[true] = human_button
 	first_row.add_child(human_button)
-	var ai_button := _button("AI first", "FirstAiButton", false)
+	var ai_button := _button("AI begins", "FirstAiButton", false)
 	ai_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ai_button.pressed.connect(select_first_move.bind(false))
 	_first_buttons[false] = ai_button
 	first_row.add_child(ai_button)
-	_summary_label = _label("", 13.0)
+
+	var orders_panel := PanelContainer.new()
+	orders_panel.name = "SetupOrdersPanel"
+	var orders_style := StyleBoxFlat.new()
+	orders_style.bg_color = Color(0, 0, 0, 0.24)
+	orders_style.border_color = UiStyle.color("ui_line_soft")
+	orders_style.set_border_width_all(maxi(1, roundi(_dp(1.0))))
+	orders_style.set_corner_radius_all(0)
+	orders_style.content_margin_left = _dp(12.0)
+	orders_style.content_margin_right = _dp(12.0)
+	orders_style.content_margin_top = _dp(10.0)
+	orders_style.content_margin_bottom = _dp(10.0)
+	orders_panel.add_theme_stylebox_override("panel", orders_style)
+	page.add_child(orders_panel)
+	var orders_column := VBoxContainer.new()
+	orders_column.add_theme_constant_override("separation", roundi(_dp(4.0)))
+	orders_panel.add_child(orders_column)
+	_summary_label = UiStyle.make_caption("Orders", 11.0)
 	_summary_label.name = "SetupSummaryLabel"
-	_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_summary_label.add_theme_color_override("font_color", MUTED_COLOR)
-	page.add_child(_summary_label)
+	_summary_label.add_theme_color_override("font_color", UiStyle.gold())
+	orders_column.add_child(_summary_label)
+	var grid := GridContainer.new()
+	grid.name = "SetupOrdersGrid"
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", roundi(_dp(12.0)))
+	grid.add_theme_constant_override("v_separation", roundi(_dp(2.0)))
+	orders_column.add_child(grid)
+	for key: String in ["Mode", "Field", "Side", "First move"]:
+		var key_label := UiStyle.make_caption(key, 12.0)
+		key_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		key_label.custom_minimum_size.x = _dp(64.0)
+		key_label.add_theme_color_override("font_color", UiStyle.muted())
+		grid.add_child(key_label)
+		var value_label := Label.new()
+		value_label.name = "Order%s" % key.replace(" ", "")
+		value_label.add_theme_font_size_override("font_size", roundi(_dp(13.0)))
+		value_label.add_theme_color_override("font_color", UiStyle.parchment())
+		value_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		value_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(value_label)
+		_orders_values[key] = value_label
+	page.add_child(_make_note(
+		"Fog is per side. Each commander knows only the ground their army has scouted."
+	))
 	return page
 
 
@@ -443,7 +494,13 @@ func _rebuild_map_buttons() -> void:
 	_map_buttons.clear()
 	for entry: MapEntry in _maps:
 		var button := _button("", "MapOption_%s" % entry.id, false)
-		button.custom_minimum_size.y = _dp(58.0)
+		button.custom_minimum_size.y = _dp(64.0)
+		button.icon = MapPreview.texture_for_entry(entry)
+		button.expand_icon = true
+		button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		button.add_theme_constant_override("icon_max_width", roundi(_dp(MAP_ICON_DP)))
+		button.add_theme_constant_override("h_separation", roundi(_dp(12.0)))
+		button.text = "%s\n%s" % [entry.display_name(), entry.summary_text()]
 		button.pressed.connect(select_map.bind(entry.id))
 		_map_buttons[entry.id] = button
 		_map_list.add_child(button)
@@ -482,18 +539,16 @@ func _refresh() -> void:
 	_options_page.visible = _page == Page.OPTIONS
 	_online_page.visible = _page == Page.ONLINE
 	if _page == Page.ONLINE:
-		_step_label.text = "Server and room"
+		_step_label.text = "ONLINE ROOM"
 	else:
-		_step_label.text = "Step %d of 3 — %s" % [
-			int(_page) + 1,
-			["Mode", "Map", "Side and first move"][int(_page)],
-		]
+		_step_label.text = ["I  ·  MODE", "II  ·  FIELD", "III  ·  COMMAND"][int(_page)]
 	_back_button.visible = _page != Page.MODE and _page != Page.ONLINE
 	_primary_button.visible = _page != Page.ONLINE
-	_primary_button.text = "Start Match" if _page == Page.OPTIONS else "Continue"
+	_primary_button.text = "Begin match" if _page == Page.OPTIONS else "Continue"
 	_refresh_buttons()
 	_refresh_summary_and_error()
 	_update_panel_size()
+	TextScale.apply(self)
 
 
 func _refresh_buttons() -> void:
@@ -502,37 +557,62 @@ func _refresh_buttons() -> void:
 		var mode := _mode_for_id(mode_id)
 		var name := mode.display_name if mode != null else mode_id
 		var selected := mode_id == _selected_mode_id
-		button.text = "%s %s" % ["●" if selected else "○", name]
-		_set_selected_color(button, selected)
+		button.text = name
+		_apply_selectable_style(button, selected)
 	for map_id: String in _map_buttons:
 		var button := _map_buttons[map_id] as Button
 		var entry := _map_for_id(map_id)
 		if entry == null:
 			continue
 		var selected := map_id == _selected_map_id
-		button.text = "%s %s\n%s" % [
-			"●" if selected else "○",
-			entry.display_name(),
-			entry.summary_text(),
-		]
-		_set_selected_color(button, selected)
+		button.text = "%s\n%s" % [entry.display_name(), entry.summary_text()]
+		_apply_selectable_style(button, selected)
 	for player: int in _side_buttons:
 		var side_button := _side_buttons[player] as Button
 		var selected := player == _human_player
-		side_button.text = "%s Player %d" % ["●" if selected else "○", player]
-		_set_selected_color(side_button, selected)
+		side_button.text = "Player %d" % player
+		_apply_selectable_style(side_button, selected)
 	for human_first: bool in _first_buttons:
 		var first_button := _first_buttons[human_first] as Button
 		var selected := human_first == _first_is_human
-		first_button.text = "%s %s first" % [
-			"●" if selected else "○",
-			"You" if human_first else "AI",
-		]
-		_set_selected_color(first_button, selected)
+		_apply_selectable_style(first_button, selected)
 	var selected_mode := _mode_for_id(_selected_mode_id)
 	_mode_description.text = (
 		selected_mode.description if selected_mode != null else ""
 	)
+
+
+func _apply_selectable_style(button: Button, selected: bool) -> void:
+	var style := (
+		UiStyle.selected_button_style()
+		if selected
+		else UiStyle.button_style()
+	)
+	button.add_theme_stylebox_override("normal", style)
+	button.add_theme_stylebox_override("hover", _hover_of(style))
+	button.add_theme_stylebox_override("pressed", _pressed_of(style))
+	_apply_font_state(button, selected, UiStyle.gold())
+
+
+func _apply_font_state(button: Button, selected: bool, accent: Color) -> void:
+	var text_color := accent if selected else UiStyle.parchment()
+	button.add_theme_color_override("font_color", text_color)
+	button.add_theme_color_override("font_hover_color", text_color)
+	button.add_theme_color_override("font_pressed_color", text_color)
+	button.add_theme_color_override("font_focus_color", text_color)
+
+
+func _hover_of(style: StyleBoxFlat) -> StyleBoxFlat:
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = style.bg_color.lightened(0.07)
+	hover.border_color = style.border_color.lightened(0.14)
+	return hover
+
+
+func _pressed_of(style: StyleBoxFlat) -> StyleBoxFlat:
+	var pressed := style.duplicate() as StyleBoxFlat
+	pressed.bg_color = style.bg_color.darkened(0.1)
+	return pressed
 
 
 func _refresh_summary_and_error() -> void:
@@ -541,7 +621,14 @@ func _refresh_summary_and_error() -> void:
 		_error_label.visible = false
 		return
 	var config := current_config()
-	_summary_label.text = config.summary_text()
+	var selected_mode := _mode_for_id(_selected_mode_id)
+	var entry := _map_for_id(_selected_map_id)
+	_orders_values["Mode"].text = (
+		selected_mode.display_name if selected_mode != null else "—"
+	)
+	_orders_values["Field"].text = entry.display_name() if entry != null else "—"
+	_orders_values["Side"].text = "Player %d" % _human_player
+	_orders_values["First move"].text = "You" if _first_is_human else "AI"
 	var errors: Array[String] = []
 	if _modes.is_empty():
 		errors.append("No enabled match modes are available.")
@@ -641,11 +728,15 @@ func _map_for_id(map_id: String) -> MapEntry:
 	return null
 
 
-func _label(text: String, font_dp: float) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", roundi(_dp(font_dp)))
-	return label
+func _make_note(text: String) -> VBoxContainer:
+	var note := VBoxContainer.new()
+	note.name = "SetupNote"
+	note.add_theme_constant_override("separation", roundi(_dp(5.0)))
+	note.add_child(UiStyle.make_rule(UiStyle.color("ui_line_soft")))
+	var label := UiStyle.make_caption(text, 11.0)
+	label.add_theme_color_override("font_color", UiStyle.muted().darkened(0.08))
+	note.add_child(label)
+	return note
 
 
 func _button(text: String, node_name: String, centered: bool) -> Button:
@@ -659,52 +750,8 @@ func _button(text: String, node_name: String, centered: bool) -> Button:
 		HORIZONTAL_ALIGNMENT_CENTER if centered else HORIZONTAL_ALIGNMENT_LEFT
 	)
 	button.add_theme_font_size_override("font_size", roundi(_dp(15.0)))
-	button.add_theme_color_override("font_color", TEXT_COLOR)
-	button.add_theme_color_override("font_hover_color", TEXT_COLOR)
-	button.add_theme_color_override("font_pressed_color", TEXT_COLOR)
-	button.add_theme_color_override("font_focus_color", TEXT_COLOR)
-	button.add_theme_stylebox_override("normal", _button_style(BUTTON_COLOR))
-	button.add_theme_stylebox_override("hover", _button_style(BUTTON_HOVER_COLOR))
-	button.add_theme_stylebox_override("pressed", _button_style(BUTTON_PRESSED_COLOR))
-	button.add_theme_stylebox_override("focus", _button_focus_style())
+	UiStyle.style_button(button)
 	return button
-
-
-func _button_style(color: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.border_color = BUTTON_BORDER_COLOR
-	style.set_border_width_all(maxi(1, roundi(_dp(1.0))))
-	style.set_corner_radius_all(roundi(_dp(8.0)))
-	style.content_margin_left = _dp(12.0)
-	style.content_margin_right = _dp(12.0)
-	style.content_margin_top = _dp(8.0)
-	style.content_margin_bottom = _dp(8.0)
-	return style
-
-
-func _button_focus_style() -> StyleBoxFlat:
-	var style := _button_style(BUTTON_HOVER_COLOR)
-	style.border_color = ACCENT_COLOR
-	style.set_border_width_all(maxi(2, roundi(_dp(2.0))))
-	return style
-
-
-func _set_selected_color(button: Button, selected: bool) -> void:
-	var color := ACCENT_COLOR if selected else TEXT_COLOR
-	button.add_theme_color_override("font_color", color)
-	button.add_theme_color_override("font_hover_color", color)
-	button.add_theme_color_override("font_pressed_color", color)
-	button.add_theme_color_override("font_focus_color", color)
-
-
-func _style_panel(panel: PanelContainer) -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = PANEL_COLOR
-	style.border_color = PANEL_BORDER
-	style.set_border_width_all(maxi(1, roundi(_dp(1.0))))
-	style.set_corner_radius_all(roundi(_dp(14.0)))
-	panel.add_theme_stylebox_override("panel", style)
 
 
 func _dp(value: float) -> float:

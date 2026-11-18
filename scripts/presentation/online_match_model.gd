@@ -34,6 +34,7 @@ var recruitment_spawn_tiles: Array[Vector2i] = []
 var pending_promotion_tile: Vector2i = NO_TILE
 var pending_promotion_unit_id: int = -1
 var action_log: Array[String] = []
+var stats := MatchStats.new()
 
 var _recruitment_type: int = -1
 var _bridge_mode: int = BridgeMode.NONE
@@ -364,15 +365,20 @@ func get_unit_info(unit_id: int) -> Dictionary:
 		return {}
 	var definition := unit.definition()
 	var terrain_name := "Unknown"
+	var terrain_modifier := 0
 	var data := view.board.get_tile(unit.tile)
 	if data != null:
-		terrain_name = TerrainRegistry.get_definition(data.terrain).display_name
+		var terrain_definition := TerrainRegistry.get_definition(data.terrain)
+		terrain_name = terrain_definition.display_name
+		terrain_modifier = int(terrain_definition.vision_modifier)
 	return {
 		"id": unit.id,
 		"type": int(unit.type),
 		"name": definition.display_name,
 		"owner": int(unit.owner),
 		"vision": definition.base_vision,
+		"effective_vision": VisionRules.effective_vision(view.board, unit),
+		"terrain_vision_modifier": terrain_modifier,
 		"can_capture": definition.can_capture,
 		"price": definition.price,
 		"movement_category": int(definition.movement_category),
@@ -392,6 +398,10 @@ func selected_unit_info() -> Dictionary:
 
 func log_entries() -> Array[String]:
 	return action_log.duplicate()
+
+
+func match_stats() -> MatchStats:
+	return stats
 
 
 func append_public_log(message: String) -> void:

@@ -58,6 +58,7 @@ static func clear_knowledge(state: GameState) -> void:
 		knowledge.explored.clear()
 		knowledge.visible.clear()
 		knowledge.detected_enemy_ids.clear()
+		knowledge.known_tiles.clear()
 
 
 static func reset_knowledge(state: GameState) -> void:

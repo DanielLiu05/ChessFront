@@ -66,6 +66,11 @@ text = "Ready."
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 15
 
+[node name="MenuButton" type="Button" parent="TopBar/Layout/StatusBar"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Menu"
+
 [node name="ReturnSetupButton" type="Button" parent="TopBar/Layout/StatusBar"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -76,23 +81,32 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Help"
 
-[node name="LeftPanel" type="PanelContainer" parent="."]
+[node name="LeftRail" type="VBoxContainer" parent="."]
 layout_mode = 1
 offset_left = 12.0
 offset_top = 108.0
 offset_right = 288.0
-offset_bottom = 430.0
+offset_bottom = -12.0
+anchor_bottom = 1.0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
 
-[node name="Layout" type="VBoxContainer" parent="LeftPanel"]
+[node name="LeftPanel" type="PanelContainer" parent="LeftRail"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Layout" type="VBoxContainer" parent="LeftRail/LeftPanel"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="Heading" type="Label" parent="LeftPanel/Layout"]
+[node name="Heading" type="Label" parent="LeftRail/LeftPanel/Layout"]
 layout_mode = 2
 text = "Selected Unit"
 theme_override_font_sizes/font_size = 18
 
-[node name="UnitInfoLabel" type="Label" parent="LeftPanel/Layout"]
+[node name="UnitInfoLabel" type="Label" parent="LeftRail/LeftPanel/Layout"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 110)
 layout_mode = 2
@@ -100,143 +114,147 @@ text = "No unit selected."
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 15
 
-[node name="Separator" type="HSeparator" parent="LeftPanel/Layout"]
+[node name="Separator" type="HSeparator" parent="LeftRail/LeftPanel/Layout"]
 layout_mode = 2
 
-[node name="PassButton" type="Button" parent="LeftPanel/Layout"]
+[node name="PassButton" type="Button" parent="LeftRail/LeftPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Pass"
 
-[node name="BuildBridgeButton" type="Button" parent="LeftPanel/Layout"]
+[node name="BuildBridgeButton" type="Button" parent="LeftRail/LeftPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Build Bridge"
 
-[node name="DestroyBridgeButton" type="Button" parent="LeftPanel/Layout"]
+[node name="DestroyBridgeButton" type="Button" parent="LeftRail/LeftPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Destroy Bridge"
 
-[node name="CancelActionButton" type="Button" parent="LeftPanel/Layout"]
+[node name="CancelActionButton" type="Button" parent="LeftRail/LeftPanel/Layout"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 text = "Cancel Mode"
 
-[node name="DrawPanel" type="PanelContainer" parent="."]
-layout_mode = 1
-anchor_bottom = 1.0
-offset_left = 12.0
-offset_top = 440.0
-offset_right = 288.0
-offset_bottom = -12.0
-grow_vertical = 0
+[node name="RailSpacer" type="Control" parent="LeftRail"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
 
-[node name="Layout" type="VBoxContainer" parent="DrawPanel"]
+[node name="DrawPanel" type="PanelContainer" parent="LeftRail"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Layout" type="VBoxContainer" parent="LeftRail/DrawPanel"]
 layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="Heading" type="Label" parent="DrawPanel/Layout"]
+[node name="Heading" type="Label" parent="LeftRail/DrawPanel/Layout"]
 layout_mode = 2
 text = "Draw"
 theme_override_font_sizes/font_size = 18
 
-[node name="DrawStatusLabel" type="Label" parent="DrawPanel/Layout"]
+[node name="DrawStatusLabel" type="Label" parent="LeftRail/DrawPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "No draw offer."
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 14
 
-[node name="OfferDrawButton" type="Button" parent="DrawPanel/Layout"]
+[node name="OfferDrawButton" type="Button" parent="LeftRail/DrawPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Offer Draw"
 
-[node name="AcceptDrawButton" type="Button" parent="DrawPanel/Layout"]
+[node name="AcceptDrawButton" type="Button" parent="LeftRail/DrawPanel/Layout"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 text = "Accept Draw"
 
-[node name="DeclineDrawButton" type="Button" parent="DrawPanel/Layout"]
+[node name="DeclineDrawButton" type="Button" parent="LeftRail/DrawPanel/Layout"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 text = "Decline Draw"
 
-[node name="RightPanel" type="PanelContainer" parent="."]
+[node name="RightRail" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -250.0
 offset_top = 108.0
 offset_right = -12.0
-offset_bottom = 430.0
+offset_bottom = -12.0
+anchor_bottom = 1.0
 grow_horizontal = 0
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
 
-[node name="Layout" type="VBoxContainer" parent="RightPanel"]
+[node name="RightPanel" type="PanelContainer" parent="RightRail"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Layout" type="VBoxContainer" parent="RightRail/RightPanel"]
 layout_mode = 2
 theme_override_constants/separation = 5
 
-[node name="Heading" type="Label" parent="RightPanel/Layout"]
+[node name="Heading" type="Label" parent="RightRail/RightPanel/Layout"]
 layout_mode = 2
 text = "Recruit"
 theme_override_font_sizes/font_size = 18
 
-[node name="RecruitPawnButton" type="Button" parent="RightPanel/Layout"]
+[node name="RecruitPawnButton" type="Button" parent="RightRail/RightPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Pawn (1)"
 
-[node name="RecruitScoutButton" type="Button" parent="RightPanel/Layout"]
+[node name="RecruitScoutButton" type="Button" parent="RightRail/RightPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Scout (2)"
 
-[node name="RecruitKnightButton" type="Button" parent="RightPanel/Layout"]
+[node name="RecruitKnightButton" type="Button" parent="RightRail/RightPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Knight (3)"
 
-[node name="RecruitBishopButton" type="Button" parent="RightPanel/Layout"]
+[node name="RecruitBishopButton" type="Button" parent="RightRail/RightPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Bishop (4)"
 
-[node name="RecruitEngineerButton" type="Button" parent="RightPanel/Layout"]
+[node name="RecruitEngineerButton" type="Button" parent="RightRail/RightPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Engineer (4)"
 
-[node name="RecruitRookButton" type="Button" parent="RightPanel/Layout"]
+[node name="RecruitRookButton" type="Button" parent="RightRail/RightPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Rook (5)"
 
-[node name="LogPanel" type="PanelContainer" parent="."]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -250.0
-offset_top = 440.0
-offset_right = -12.0
-offset_bottom = -12.0
-grow_horizontal = 0
-grow_vertical = 0
+[node name="LogPanel" type="PanelContainer" parent="RightRail"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
-[node name="Layout" type="VBoxContainer" parent="LogPanel"]
+[node name="Layout" type="VBoxContainer" parent="RightRail/LogPanel"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="Heading" type="Label" parent="LogPanel/Layout"]
+[node name="Heading" type="Label" parent="RightRail/LogPanel/Layout"]
 layout_mode = 2
 text = "Action Log"
 theme_override_font_sizes/font_size = 18
 
-[node name="LogLabel" type="Label" parent="LogPanel/Layout"]
+[node name="LogLabel" type="Label" parent="RightRail/LogPanel/Layout"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
@@ -371,9 +389,19 @@ horizontal_alignment = 1
 autowrap_mode = 2
 theme_override_font_sizes/font_size = 16
 
-[node name="GameOverButtons" type="HBoxContainer" parent="GameOverOverlay/Center/Panel/Layout"]
+[node name="GameOverRule" type="HSeparator" parent="GameOverOverlay/Center/Panel/Layout"]
+
+[node name="GameOverStats" type="GridContainer" parent="GameOverOverlay/Center/Panel/Layout"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/h_separation = 28
+theme_override_constants/v_separation = 4
+columns = 2
+
+[node name="GameOverButtons" type="HFlowContainer" parent="GameOverOverlay/Center/Panel/Layout"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
 
 [node name="GameOverRematchButton" type="Button" parent="GameOverOverlay/Center/Panel/Layout/GameOverButtons"]
 unique_name_in_owner = true

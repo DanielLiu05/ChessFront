@@ -34,17 +34,38 @@ func test_fog_states_and_hidden_piece_visibility() -> bool:
 	var visible_tile := board.get_tile_view(Vector2i(8, 8))
 	assert_eq(visible_tile.get_fog_state(), TileView.FogState.VISIBLE, "visible tile")
 	assert_true(visible_tile.is_terrain_visible(), "visible terrain is shown")
-	assert_false(visible_tile.is_fog_overlay_visible(), "no overlay on visible tile")
 	var explored_tile := board.get_tile_view(Vector2i(3, 3))
 	assert_eq(explored_tile.get_fog_state(), TileView.FogState.EXPLORED, "explored tile")
 	assert_true(explored_tile.is_terrain_visible(), "explored terrain is shown")
-	assert_true(explored_tile.is_fog_overlay_visible(), "explored tile has fog overlay")
 	var unexplored_tile := board.get_tile_view(Vector2i(0, 8))
 	assert_eq(
 		unexplored_tile.get_fog_state(), TileView.FogState.UNEXPLORED, "unexplored tile"
 	)
 	assert_false(unexplored_tile.is_terrain_visible(), "unexplored terrain is hidden")
-	assert_true(unexplored_tile.is_fog_tile_visible(), "unexplored fog tile is shown")
+	assert_true(unexplored_tile.is_fog_tile_visible(), "unexplored fog base is shown")
+	var fog := board.get_fog_layer()
+	assert_eq(
+		fog.state_at(Vector2i(8, 8)), TileView.FogState.VISIBLE, "fog layer sees visible"
+	)
+	assert_eq(
+		fog.state_at(Vector2i(3, 3)), TileView.FogState.EXPLORED, "fog layer sees explored"
+	)
+	assert_eq(
+		fog.state_at(Vector2i(0, 8)), TileView.FogState.UNEXPLORED, "fog layer sees fog"
+	)
+	assert_true(
+		fog.coverage_at(Vector2i(0, 8)) > fog.coverage_at(Vector2i(3, 3)),
+		"unexplored fog is denser than the explored veil"
+	)
+	assert_true(fog.coverage_at(Vector2i(8, 8)) == 0.0, "visible tiles carry no fog")
+	assert_true(
+		fog.coverage_at(Vector2i(3, 3)) >= 0.8,
+		"explored fog is heavy enough to read as a distinct state"
+	)
+	assert_true(
+		explored_tile.cursor_height() < explored_tile.highlight_height(),
+		"hover cursor sits on the board while destination markers stay above the fog"
+	)
 
 	knowledge.mark_enemy_detected(hidden.id)
 	view = PlayerView.for_player(state, PLAYER_1)
@@ -124,20 +145,12 @@ func test_terrain_decorations_and_markers() -> bool:
 	assert_not_null(packed, "tile scene loads")
 	if packed == null:
 		return true
-	var forest := packed.instantiate() as TileView
-	forest.setup(Vector2i(4, 4), TerrainType.Type.FOREST, Vector3.ZERO)
-	var forest_decorations := forest.get_node_or_null("Decorations")
-	assert_not_null(forest_decorations, "forest decorations exist")
-	if forest_decorations != null:
-		assert_true(forest_decorations.get_child_count() > 0, "forest has trees")
-	forest.free()
-
 	var hill := packed.instantiate() as TileView
 	hill.setup(Vector2i(4, 4), TerrainType.Type.HILL, Vector3.ZERO)
-	var hill_decorations := hill.get_node_or_null("Decorations")
-	assert_not_null(hill_decorations, "hill decorations exist")
-	if hill_decorations != null:
-		assert_true(hill_decorations.get_child_count() > 0, "hill has rocks")
+	var hill_detail := hill.get_node_or_null("TerrainDetail")
+	assert_not_null(hill_detail, "hill detail layer exists")
+	if hill_detail != null:
+		assert_true(hill_detail.get_child_count() > 0, "hill has a riser and cap")
 	assert_true(
 		hill.surface_height() > TileView.height_for_terrain(TerrainType.Type.GROUND),
 		"hill is taller than ground"
@@ -186,6 +199,80 @@ func test_all_piece_types_build_with_pick_metadata() -> bool:
 			assert_eq(body.get_meta("tile"), Vector2i(8, 8), "piece collider metadata")
 		assert_true(piece.get_child_count() >= 2, "piece has visuals and collider")
 		piece.free()
+	return true
+
+
+func test_piece_ownership_encoding_and_token_mode() -> bool:
+	var packed := load("res://scenes/pieces/Piece.tscn") as PackedScene
+	var light := packed.instantiate() as PieceView
+	light.setup(1, UnitType.Type.KING, PLAYER_1, Vector2i(4, 4), Vector3.ZERO)
+	var notches := light.find_children("RingNotch*", "MeshInstance3D", true, false)
+	assert_eq(notches.size(), 8, "light army has notched rings on both discs")
+	assert_false(light.is_token_mode(), "full piece starts in sculpt mode")
+	var visual := light.get_node_or_null("Visual") as Node3D
+	var token := light.get_node_or_null("Token") as Node3D
+	assert_not_null(visual, "sculpt root exists")
+	assert_not_null(token, "token root exists")
+	if visual != null and token != null:
+		assert_true(visual.visible, "sculpt root visible")
+		assert_false(token.visible, "token root hidden")
+	light.set_token_mode(true)
+	assert_true(light.is_token_mode(), "token mode enables")
+	if visual != null and token != null:
+		assert_false(visual.visible, "sculpt root hidden in token mode")
+		assert_true(token.visible, "token root visible")
+	light.set_selected(true)
+	assert_true(light.is_selected(), "selection state tracked")
+	assert_true(light.has_blob_shadow(), "blob shadow defaults on")
+	light.set_blob_shadow(false)
+	assert_false(light.has_blob_shadow(), "blob shadow toggles")
+	light.free()
+
+	var dark := packed.instantiate() as PieceView
+	dark.setup(2, UnitType.Type.PAWN, PLAYER_2, Vector2i(5, 5), Vector3.ZERO)
+	assert_eq(
+		dark.find_children("RingNotch*", "MeshInstance3D", true, false).size(),
+		0,
+		"dark army ring is smooth"
+	)
+	dark.free()
+	return true
+
+
+func test_destination_marker_variants_and_path_preview() -> bool:
+	var board := _board_view()
+	board.build(BoardData.create_standard())
+	var guaranteed := Vector2i(4, 3)
+	var attempt := Vector2i(5, 3)
+	var capture := Vector2i(6, 3)
+	var frontier := Vector2i(7, 3)
+	board.set_highlights(
+		Vector2i(-1, -1),
+		[guaranteed, attempt],
+		[capture],
+		[],
+		[],
+		[],
+		[attempt],
+		[frontier]
+	)
+	assert_true(board.has_highlight(guaranteed), "guaranteed destination is marked")
+	assert_true(board.has_highlight(attempt), "attempt destination is marked")
+	assert_true(board.has_highlight(capture), "capture destination is marked")
+	board.set_path_preview(
+		[Vector2i(4, 4)],
+		[Vector2i(4, 3)]
+	)
+	assert_true(board.has_path_preview(), "path preview appears")
+	assert_eq(board.path_preview_count(), 2, "solid and uncertain dots are drawn")
+	board.clear_path_preview()
+	assert_false(board.has_path_preview(), "path preview clears")
+	board.set_threat_tile(Vector2i(8, 8))
+	assert_true(board.has_threat_marker(), "threat ring appears")
+	assert_eq(board.threat_tile(), Vector2i(8, 8), "threat ring targets the King")
+	board.set_threat_tile(BoardView.NO_TILE)
+	assert_false(board.has_threat_marker(), "threat ring clears")
+	board.free()
 	return true
 
 

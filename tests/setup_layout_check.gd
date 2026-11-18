@@ -83,7 +83,21 @@ func _check_page(
 			continue
 		buttons += 1
 		var rect := button.get_global_rect()
-		if not safe.encloses(rect):
+		var scroll := _scroll_ancestor(button)
+		if scroll != null:
+			var scroll_rect := scroll.get_global_rect()
+			if rect.position.x < scroll_rect.position.x - 1.0 \
+					or rect.end.x > scroll_rect.end.x + 1.0:
+				_fail(
+					"%s button %s is clipped horizontally by its scroll at %s: %s"
+					% [page_name, button.name, str(size), str(rect)]
+				)
+			if scroll.get_h_scroll_bar().visible:
+				_fail(
+					"%s scroll shows a horizontal scrollbar at %s"
+					% [page_name, str(size)]
+				)
+		elif not safe.encloses(rect):
 			_fail(
 				"%s button %s is outside the safe area at %s: %s"
 				% [page_name, button.name, str(size), str(rect)]
@@ -95,6 +109,15 @@ func _check_page(
 			)
 	if buttons == 0:
 		_fail("No interactive buttons on the %s page at %s" % [page_name, str(size)])
+
+
+func _scroll_ancestor(control: Control) -> ScrollContainer:
+	var node := control.get_parent()
+	while node != null:
+		if node is ScrollContainer:
+			return node as ScrollContainer
+		node = node.get_parent()
+	return null
 
 
 func _fail(message: String) -> void:

@@ -181,8 +181,10 @@ func _test_back_stack() -> void:
 		_fail("Back closed the menu before clearing selection")
 	if not _main.handle_back_request() or _hud.is_menu_open():
 		_fail("Second back did not close the menu")
-	if _main.handle_back_request():
-		_fail("Back should be a no-op at the root")
+	if not _main.handle_back_request() or not _main.is_paused():
+		_fail("Back did not open the pause menu at the root")
+	if not _main.handle_back_request() or _main.is_paused():
+		_fail("Back did not resume from the pause menu")
 	_main.model.pending_promotion_unit_id = _main.state.get_unit_at(Vector2i(4, 14)).id
 	_main.model.pending_promotion_tile = Vector2i(4, 13)
 	_main._refresh_presentation(false)

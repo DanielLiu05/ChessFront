@@ -60,10 +60,16 @@ func _apply_known_terrain(source: BoardData) -> void:
 	for tile: Vector2i in board.get_playable_tiles():
 		var target := board.get_tile(tile)
 		if knowledge.is_explored(tile):
-			var source_tile := source.get_tile(tile)
-			target.terrain = source_tile.terrain
-			target.elevation = source_tile.elevation
-			target.has_bridge = source_tile.has_bridge
+			var known := knowledge.get_known_tile(tile)
+			if not known.is_empty():
+				target.terrain = int(known["terrain"])
+				target.elevation = int(known["elevation"])
+				target.has_bridge = bool(known["has_bridge"])
+			else:
+				var source_tile := source.get_tile(tile)
+				target.terrain = source_tile.terrain
+				target.elevation = source_tile.elevation
+				target.has_bridge = source_tile.has_bridge
 		else:
 			target.terrain = TerrainType.Type.GROUND
 			target.elevation = 0

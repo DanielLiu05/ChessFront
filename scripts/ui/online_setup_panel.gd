@@ -4,14 +4,10 @@ extends VBoxContainer
 signal back_requested
 signal match_started(assignment: Dictionary)
 
-const ACCENT_COLOR: Color = Color(0.45, 0.75, 1.0, 1.0)
-const ERROR_COLOR: Color = Color(1.0, 0.55, 0.45, 1.0)
-const MUTED_COLOR: Color = Color(0.68, 0.76, 0.86, 1.0)
-const TEXT_COLOR: Color = Color(0.9, 0.94, 1.0, 1.0)
-const BUTTON_COLOR: Color = Color(0.08, 0.11, 0.15, 1.0)
-const BUTTON_HOVER_COLOR: Color = Color(0.12, 0.17, 0.23, 1.0)
-const BUTTON_PRESSED_COLOR: Color = Color(0.16, 0.22, 0.3, 1.0)
-const BUTTON_BORDER_COLOR: Color = Color(0.2, 0.3, 0.42, 1.0)
+var ACCENT_COLOR: Color = UiStyle.gold()
+var ERROR_COLOR: Color = UiStyle.color("danger")
+var MUTED_COLOR: Color = UiStyle.muted()
+var TEXT_COLOR: Color = UiStyle.parchment()
 
 var client: OnlineClient
 
@@ -153,8 +149,10 @@ func _ensure_ui() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_theme_constant_override("separation", roundi(_dp(8.0)))
 
-	var title := _label("Online play", 20.0)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var overline := UiStyle.make_overline("Connection")
+	add_child(overline)
+	var title := _label("Online play", 22.0)
+	title.add_theme_color_override("font_color", TEXT_COLOR)
 	add_child(title)
 	_status_label = _label("", 12.0)
 	_status_label.name = "OnlineStatus"
@@ -184,6 +182,7 @@ func _ensure_ui() -> void:
 	_url_edit.custom_minimum_size.y = _dp(MobileMetrics.TOUCH_TARGET_DP)
 	_url_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_url_edit.add_theme_font_size_override("font_size", roundi(_dp(14.0)))
+	_style_line_edit(_url_edit)
 	if client != null:
 		_url_edit.text = client.last_url_hint()
 	_url_edit.text_submitted.connect(func(_text: String) -> void: _on_connect_pressed())
@@ -208,6 +207,7 @@ func _ensure_ui() -> void:
 	_connect_section.add_theme_constant_override("separation", roundi(_dp(6.0)))
 	content.add_child(_connect_section)
 	_create_button = _button("Create Room", "OnlineCreateButton")
+	UiStyle.style_primary_button(_create_button)
 	_create_button.pressed.connect(_on_create_pressed)
 	_connect_section.add_child(_create_button)
 	_join_row = HBoxContainer.new()
@@ -221,6 +221,7 @@ func _ensure_ui() -> void:
 	_join_edit.custom_minimum_size.y = _dp(MobileMetrics.TOUCH_TARGET_DP)
 	_join_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_join_edit.add_theme_font_size_override("font_size", roundi(_dp(14.0)))
+	_style_line_edit(_join_edit)
 	_join_edit.text_changed.connect(_on_join_text_changed)
 	_join_edit.text_submitted.connect(func(_text: String) -> void: _on_join_pressed())
 	_join_row.add_child(_join_edit)
@@ -264,7 +265,8 @@ func _ensure_ui() -> void:
 	_map_status_label.name = "OnlineMapStatus"
 	_map_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_room_section.add_child(_map_status_label)
-	_start_button = _button("Start Match", "OnlineStartButton")
+	_start_button = _button("Begin match", "OnlineStartButton")
+	UiStyle.style_primary_button(_start_button)
 	_start_button.pressed.connect(_on_start_pressed)
 	_room_section.add_child(_start_button)
 	_waiting_label = _label("Waiting for the room owner to start.", 12.0)
@@ -287,10 +289,12 @@ func _ensure_ui() -> void:
 	_room_section.add_child(_assignment_label)
 
 	_leave_button = _button("Back", "OnlineLeaveButton")
+	UiStyle.style_quiet_button(_leave_button)
 	_leave_button.pressed.connect(_on_leave_pressed)
 	content.add_child(_leave_button)
 
 	_build_map_buttons()
+	UiStyle.apply_scrollbar_theme(self)
 	if client != null:
 		_bind_client_signals()
 	_refresh()
@@ -300,6 +304,12 @@ func _build_map_buttons() -> void:
 	_map_entries = MapLibrary.list_entries()
 	for entry: MapEntry in _map_entries:
 		var map_button := _button(entry.display_name(), "OnlineMap_%s" % entry.id)
+		map_button.custom_minimum_size.y = _dp(56.0)
+		map_button.icon = MapPreview.texture_for_entry(entry)
+		map_button.expand_icon = true
+		map_button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		map_button.add_theme_constant_override("icon_max_width", roundi(_dp(40.0)))
+		map_button.add_theme_constant_override("h_separation", roundi(_dp(10.0)))
 		map_button.pressed.connect(_select_map.bind(entry.id))
 		_map_buttons[entry.id] = map_button
 		_map_list.add_child(map_button)
@@ -380,7 +390,13 @@ func _refresh() -> void:
 				continue
 			map_button.disabled = not owner or in_match
 			var selected := entry.id == map_id
-			map_button.text = "%s %s" % ["●" if selected else "○", entry.display_name()]
+			map_button.text = entry.display_name()
+			map_button.add_theme_stylebox_override(
+				"normal",
+				UiStyle.selected_button_style()
+				if selected
+				else UiStyle.button_style()
+			)
 			var color := ACCENT_COLOR if selected else TEXT_COLOR
 			map_button.add_theme_color_override("font_color", color)
 			map_button.add_theme_color_override("font_hover_color", color)
@@ -621,41 +637,26 @@ func _button(text: String, node_name: String) -> Button:
 	var button := Button.new()
 	button.text = text
 	button.name = node_name
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.custom_minimum_size = Vector2(
 		_dp(MobileMetrics.TOUCH_TARGET_DP),
 		_dp(MobileMetrics.TOUCH_TARGET_DP)
 	)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.add_theme_font_size_override("font_size", roundi(_dp(14.0)))
-	button.add_theme_color_override("font_color", TEXT_COLOR)
-	button.add_theme_color_override("font_hover_color", TEXT_COLOR)
-	button.add_theme_color_override("font_pressed_color", TEXT_COLOR)
-	button.add_theme_color_override("font_focus_color", TEXT_COLOR)
-	button.add_theme_stylebox_override("normal", _button_style(BUTTON_COLOR))
-	button.add_theme_stylebox_override("hover", _button_style(BUTTON_HOVER_COLOR))
-	button.add_theme_stylebox_override("pressed", _button_style(BUTTON_PRESSED_COLOR))
-	button.add_theme_stylebox_override("focus", _button_focus_style())
+	UiStyle.style_button(button)
 	return button
 
 
-func _button_style(color: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.border_color = BUTTON_BORDER_COLOR
-	style.set_border_width_all(maxi(1, roundi(_dp(1.0))))
-	style.set_corner_radius_all(roundi(_dp(8.0)))
-	style.content_margin_left = _dp(10.0)
-	style.content_margin_right = _dp(10.0)
-	style.content_margin_top = _dp(6.0)
-	style.content_margin_bottom = _dp(6.0)
-	return style
-
-
-func _button_focus_style() -> StyleBoxFlat:
-	var style := _button_style(BUTTON_HOVER_COLOR)
-	style.border_color = ACCENT_COLOR
-	style.set_border_width_all(maxi(2, roundi(_dp(2.0))))
-	return style
+func _style_line_edit(edit: LineEdit) -> void:
+	edit.add_theme_color_override("font_color", TEXT_COLOR)
+	edit.add_theme_color_override("font_placeholder_color", MUTED_COLOR.darkened(0.12))
+	edit.add_theme_color_override("caret_color", ACCENT_COLOR)
+	edit.add_theme_color_override("selection_color", Color(ACCENT_COLOR, 0.3))
+	edit.add_theme_stylebox_override(
+		"normal", UiStyle.button_style(Color(0, 0, 0, 0.35))
+	)
+	edit.add_theme_stylebox_override("focus", UiStyle.focus_style())
 
 
 func _dp(value: float) -> float:

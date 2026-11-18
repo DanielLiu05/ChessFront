@@ -28,7 +28,7 @@ var distance: float = DEFAULT_DISTANCE
 var target_distance: float = DEFAULT_DISTANCE
 
 var mobile_mode: bool = false
-var mobile_pitch_degrees: float = DEFAULT_PITCH_DEGREES
+var mobile_pitch_degrees: float = 60.0
 var mobile_board_bounds: Rect2 = Rect2(
 	Vector2(-GameConfig.BOARD_WIDTH * 0.5, -GameConfig.BOARD_HEIGHT * 0.5),
 	Vector2(GameConfig.BOARD_WIDTH, GameConfig.BOARD_HEIGHT)
@@ -41,6 +41,9 @@ var _mobile_min_distance: float = MIN_DISTANCE
 var _mobile_max_distance: float = MAX_DISTANCE
 var _mobile_overview_distance: float = DEFAULT_DISTANCE
 var _mobile_tactical_distance: float = MIN_DISTANCE
+var _shake_time: float = 0.0
+var _shake_duration: float = 0.0
+var _shake_strength: float = 0.0
 
 @onready var camera: Camera3D = $Camera3D
 
@@ -65,6 +68,8 @@ func _process(delta: float) -> void:
 	focus = focus.lerp(target_focus, focus_weight)
 	var zoom_weight := 1.0 - exp(-ZOOM_SMOOTHING * delta)
 	distance = lerpf(distance, target_distance, zoom_weight)
+	if _shake_time > 0.0:
+		_shake_time = maxf(0.0, _shake_time - delta)
 	if mobile_mode:
 		target_distance = clampf(
 			target_distance, _mobile_min_distance, _mobile_max_distance
@@ -102,6 +107,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		if key.pressed and not key.echo and key.keycode == KEY_HOME:
 			reset_view()
 			_mark_input_handled()
+
+
+func add_shake(strength: float, duration_seconds: float) -> void:
+	if duration_seconds <= 0.0 or strength <= 0.0:
+		return
+	_shake_strength = maxf(_shake_strength, strength)
+	_shake_duration = maxf(_shake_duration, duration_seconds)
+	_shake_time = maxf(_shake_time, duration_seconds)
+
+
+func clear_shake() -> void:
+	_shake_time = 0.0
+	_shake_strength = 0.0
+
+
+func is_shaking() -> bool:
+	return _shake_time > 0.0
 
 
 func rotate_by(yaw_delta_degrees: float, pitch_delta_degrees: float) -> void:
@@ -431,6 +453,14 @@ func _update_camera() -> void:
 		camera.look_at(focus, Vector3.UP)
 	else:
 		camera.look_at_from_position(camera.position, focus, Vector3.UP)
+	if _shake_time > 0.0 and _shake_duration > 0.0:
+		var falloff := clampf(_shake_time / _shake_duration, 0.0, 1.0)
+		var clock := float(Time.get_ticks_msec()) * 0.001
+		camera.h_offset = sin(clock * 141.0) * _shake_strength * falloff
+		camera.v_offset = cos(clock * 113.0) * _shake_strength * falloff
+	else:
+		camera.h_offset = 0.0
+		camera.v_offset = 0.0
 
 
 func _mark_input_handled() -> void:

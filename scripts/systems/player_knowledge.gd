@@ -5,6 +5,7 @@ var player: GameConfig.Player
 var explored: Dictionary[Vector2i, bool] = {}
 var visible: Dictionary[Vector2i, bool] = {}
 var detected_enemy_ids: Dictionary[int, bool] = {}
+var known_tiles: Dictionary[Vector2i, Dictionary] = {}
 
 
 func _init(knowledge_player: GameConfig.Player) -> void:
@@ -19,6 +20,18 @@ func begin_refresh() -> void:
 func mark_visible(tile: Vector2i) -> void:
 	visible[tile] = true
 	explored[tile] = true
+
+
+func remember_tile(tile: Vector2i, terrain: int, elevation: int, has_bridge: bool) -> void:
+	known_tiles[tile] = {
+		"terrain": terrain,
+		"elevation": elevation,
+		"has_bridge": has_bridge,
+	}
+
+
+func get_known_tile(tile: Vector2i) -> Dictionary:
+	return known_tiles.get(tile, {})
 
 
 func is_explored(tile: Vector2i) -> bool:
@@ -49,7 +62,29 @@ func to_snapshot() -> Dictionary:
 	return {
 		"explored": _tiles_to_arrays(explored_tiles()),
 		"visible": _tiles_to_arrays(visible_tiles()),
+		"known_tiles": _known_tiles_to_arrays(),
 	}
+
+
+func _known_tiles_to_arrays() -> Array:
+	var tiles: Array[Vector2i] = known_tiles.keys()
+	tiles.sort_custom(
+		func(a: Vector2i, b: Vector2i) -> bool:
+			if a.y != b.y:
+				return a.y < b.y
+			return a.x < b.x
+	)
+	var entries: Array = []
+	for tile: Vector2i in tiles:
+		var data: Dictionary = known_tiles[tile]
+		entries.append([
+			tile.x,
+			tile.y,
+			int(data["terrain"]),
+			int(data["elevation"]),
+			1 if bool(data["has_bridge"]) else 0,
+		])
+	return entries
 
 
 static func _sorted_tiles(source: Dictionary[Vector2i, bool]) -> Array[Vector2i]:

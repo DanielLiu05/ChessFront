@@ -19,6 +19,8 @@ var _online_overlay_visible: bool = false
 var _online_overlay_mode: String = ""
 var _online_grace_remaining: float = 0.0
 var _online_pending_rematch: bool = false
+var _online_pending_mover_id: int = -1
+var _online_pending_mover_type: int = -1
 var _online_overlay: Control
 var _online_overlay_title: Label
 var _online_overlay_detail: Label
@@ -46,13 +48,29 @@ var _hud: HudBase
 @onready var _setup: MatchSetup = %MatchSetup
 @onready var _touch_input: TouchInputAdapter = %TouchInput
 @onready var _sun: DirectionalLight3D = get_node_or_null("Sun") as DirectionalLight3D
+@onready var _world_environment: WorldEnvironment = get_node_or_null("WorldEnvironment") as WorldEnvironment
+
+var _presentation_config: PresentationConfig
+var _vignette: VignetteOverlay
+var _pause_menu: PauseMenu
+var _settings_panel: SettingsPanel
+var _paused: bool = false
 
 
 func _ready() -> void:
 	_hud = _desktop_hud
+	_presentation_config = PresentationConfig.new()
+	_presentation_config.load_from()
+	TextScale.factor = _presentation_config.text_scale_factor()
+	_vignette = VignetteOverlay.new()
+	_vignette.name = "VignetteOverlay"
+	add_child(_vignette)
+	_build_match_menus()
 	_board.tile_clicked.connect(_on_tile_clicked)
+	_board.tile_hovered.connect(_on_board_tile_hovered)
 	_connect_hud(_desktop_hud)
 	_connect_hud(_mobile_hud)
+	_desktop_hud.log_focus_requested.connect(_on_log_focus_requested)
 	_setup.start_requested.connect(_on_setup_start_requested)
 	_setup.set_online_client(online_client)
 	online_session = OnlineMatchSession.new(online_client)
@@ -79,6 +97,26 @@ func _ready() -> void:
 		WebViewport.notify_ready()
 	_update_web_orientation_pause()
 	_install_web_test_bridge()
+	call_deferred("_apply_text_scale")
+
+
+func _build_match_menus() -> void:
+	var ui_layer := get_node_or_null("UI") as CanvasLayer
+	if ui_layer == null:
+		return
+	_pause_menu = PauseMenu.new()
+	_pause_menu.name = "PauseMenu"
+	ui_layer.add_child(_pause_menu)
+	_pause_menu.resume_requested.connect(set_paused.bind(false))
+	_pause_menu.settings_requested.connect(_on_settings_requested)
+	_pause_menu.leave_requested.connect(_on_setup_requested)
+	_settings_panel = SettingsPanel.new()
+	_settings_panel.name = "SettingsPanel"
+	ui_layer.add_child(_settings_panel)
+	_settings_panel.text_scale_changed.connect(_on_text_scale_changed)
+	_settings_panel.quality_changed.connect(_on_quality_changed)
+	_settings_panel.reduce_motion_changed.connect(_on_reduce_motion_changed)
+	_settings_panel.closed.connect(_on_settings_closed)
 
 
 func _process(delta: float) -> void:
@@ -116,6 +154,8 @@ func _connect_hud(hud: HudBase) -> void:
 	hud.decline_draw_requested.connect(_on_decline_draw_requested)
 	hud.rematch_requested.connect(_on_rematch_requested)
 	hud.setup_requested.connect(_on_setup_requested)
+	hud.pause_requested.connect(_on_pause_requested)
+	hud.settings_requested.connect(_on_settings_requested)
 
 
 func load_map(map_id: String) -> bool:
@@ -129,11 +169,13 @@ func load_map(map_id: String) -> bool:
 		return false
 	_exit_online_match()
 	_cancel_ai_work()
+	_close_match_menus()
 	_ai_brain = null
 	state = GameState.new(result.map)
 	model = PresentationModel.new(state, GameConfig.FIRST_PLAYER)
 	current_config = null
 	_board.build(state.board)
+	_apply_presentation_quality()
 	if _camera_rig != null:
 		_camera_rig.set_side_orientation(GameConfig.FIRST_PLAYER)
 		_camera_rig.set_mobile_board_bounds(_board.get_world_bounds())
@@ -157,6 +199,7 @@ func start_match(config: MatchConfig) -> bool:
 		return false
 	_cancel_ai_work()
 	_exit_online_match()
+	_close_match_menus()
 	state = GameState.new(
 		result.map,
 		GameConfig.DEFAULT_TURN_LIMIT_PLIES,
@@ -167,6 +210,7 @@ func start_match(config: MatchConfig) -> bool:
 	_ai_brain = AiBrain.new() if config.uses_ai() else null
 	current_config = config.duplicate_config()
 	_board.build(state.board)
+	_apply_presentation_quality()
 	if _camera_rig != null:
 		_camera_rig.set_side_orientation(config.human_player)
 		_camera_rig.set_mobile_board_bounds(_board.get_world_bounds())
@@ -219,8 +263,110 @@ func _on_setup_requested() -> void:
 	return_to_setup()
 
 
+func set_paused(paused: bool) -> void:
+	if paused:
+		if _paused or online_mode or _setup_visible:
+			return
+		if model == null or model.is_game_over():
+			return
+		_cancel_ai_work()
+		_paused = true
+		if _touch_input != null:
+			_touch_input.cancel_gesture()
+		if _board != null:
+			_board.clear_path_preview()
+		_refresh_presentation(false)
+		if _pause_menu != null:
+			_pause_menu.open_menu(_pause_context())
+		if _hud != null:
+			_hud.set_status("Match paused.")
+		return
+	if not _paused:
+		return
+	_paused = false
+	if _pause_menu != null:
+		_pause_menu.close_menu()
+	_refresh_presentation(false)
+	if _hud != null:
+		_hud.set_status("Resumed.")
+	_maybe_start_ai_turn()
+
+
+func is_paused() -> bool:
+	return _paused
+
+
+func pause_menu() -> PauseMenu:
+	return _pause_menu
+
+
+func settings_panel() -> SettingsPanel:
+	return _settings_panel
+
+
+func _on_pause_requested() -> void:
+	set_paused(true)
+
+
+func _on_settings_requested() -> void:
+	if _settings_panel == null:
+		return
+	_settings_panel.open(_presentation_config)
+
+
+func _on_settings_closed() -> void:
+	if _pause_menu != null and _pause_menu.is_open():
+		_pause_menu.focus_default()
+
+
+func _on_text_scale_changed(percent: int) -> void:
+	_presentation_config.set_text_scale(percent)
+	_presentation_config.save_to()
+	TextScale.factor = _presentation_config.text_scale_factor()
+	_apply_text_scale()
+
+
+func _on_quality_changed(preference: String) -> void:
+	_presentation_config.set_preference(preference)
+	_presentation_config.save_to()
+	_apply_presentation_quality()
+
+
+func _on_reduce_motion_changed(reduced: bool) -> void:
+	_presentation_config.set_reduce_motion(reduced)
+	_presentation_config.save_to()
+	_apply_presentation_quality()
+	if _camera_rig != null:
+		_camera_rig.clear_shake()
+
+
+func _apply_text_scale() -> void:
+	if _presentation_config == null:
+		return
+	TextScale.factor = _presentation_config.text_scale_factor()
+	TextScale.apply(self, TextScale.factor)
+
+
+func _pause_context() -> String:
+	var map_name := state.map_id if state != null else ""
+	if current_config != null:
+		map_name = current_config.map_display_name()
+	var player := model.local_player if model != null else GameConfig.FIRST_PLAYER
+	var ply := model.ply() if model != null else 0
+	return "%s  ·  Ply %d  ·  Player %d" % [map_name, ply, player]
+
+
+func _close_match_menus() -> void:
+	if _settings_panel != null and _settings_panel.is_open():
+		_settings_panel.close_panel()
+	if _pause_menu != null and _pause_menu.is_open():
+		_pause_menu.close_menu()
+	_paused = false
+
+
 func show_setup(config: MatchConfig = null) -> void:
 	_cancel_ai_work()
+	_close_match_menus()
 	_setup_visible = true
 	if _touch_input != null:
 		_touch_input.cancel_gesture()
@@ -270,24 +416,108 @@ func _refresh_presentation(update_board: bool) -> void:
 			view_model.explored_mine_tiles(),
 			view_model.visible_gold_token_tiles()
 		)
+	_board.clear_path_preview()
 	_board.set_highlights(
 		view_model.selected_tile,
 		view_model.legal_destinations,
 		view_model.capture_destinations,
 		view_model.bridge_build_targets,
 		view_model.bridge_destroy_targets,
-		view_model.recruitment_spawn_tiles
+		view_model.recruitment_spawn_tiles,
+		_attempt_tiles(view_model),
+		_frontier_tiles(view_model)
 	)
 	if _hud != null:
 		_hud.refresh(
 			view_model,
 			_input_locked or _web_runtime_paused or _online_action_pending
-				or _online_animation_lock or _online_overlay_visible
+				or _online_animation_lock or _online_overlay_visible or _paused
 		)
+	_update_threat_marker(view_model)
+
+
+func _attempt_tiles(view_model) -> Array[Vector2i]:
+	var tiles: Array[Vector2i] = []
+	var unit: GameUnit = view_model.selected_unit() if view_model != null else null
+	if unit == null:
+		return tiles
+	for destination: Vector2i in view_model.legal_destinations:
+		if destination in view_model.capture_destinations:
+			continue
+		if DestinationHints.is_attempt(view_model.view, unit, destination):
+			tiles.append(destination)
+	return tiles
+
+
+func _frontier_tiles(view_model) -> Array[Vector2i]:
+	var unit: GameUnit = view_model.selected_unit() if view_model != null else null
+	if unit == null:
+		return []
+	var attempts := _attempt_tiles(view_model)
+	return DestinationHints.frontier_tiles(view_model.view, unit, attempts)
+
+
+func _on_log_focus_requested(tile: Vector2i) -> void:
+	if _board == null or _camera_rig == null:
+		return
+	_camera_rig.target_focus = _board.tile_to_world(tile, 0.2)
+
+
+func _set_event_focus(tile: Vector2i) -> void:
+	if tile.x < 0:
+		return
+	_desktop_hud.set_last_event_tile(tile)
+
+
+func _update_threat_marker(view_model) -> void:
+	if _board == null or view_model == null or view_model.view == null:
+		return
+	var king: GameUnit = null
+	for unit: GameUnit in view_model.view.get_units_for_player(view_model.local_player):
+		if unit.type == UnitType.Type.KING:
+			king = unit
+			break
+	if king == null:
+		_board.set_threat_tile(BoardView.NO_TILE)
+		return
+	var threatened := false
+	for enemy: GameUnit in view_model.view.get_known_units():
+		if enemy.owner == view_model.local_player:
+			continue
+		var destinations := MovementRules.legal_destinations(
+			view_model.view, enemy, view_model.view.exploration
+		)
+		if king.tile in destinations:
+			threatened = true
+			break
+	_board.set_threat_tile(king.tile if threatened else BoardView.NO_TILE)
+
+
+func _on_board_tile_hovered(tile: Vector2i) -> void:
+	if _paused:
+		return
+	_update_path_preview(tile)
+
+
+func _update_path_preview(tile: Vector2i) -> void:
+	if _board == null or _paused:
+		return
+	var view_model = active_model()
+	var unit: GameUnit = view_model.selected_unit() if view_model != null else null
+	if tile == BoardView.NO_TILE or unit == null \
+			or not tile in view_model.legal_destinations:
+		_board.clear_path_preview()
+		return
+	var split := DestinationHints.preview_split(view_model.view, unit, tile)
+	var solid: Array[Vector2i] = []
+	solid.assign(split["solid"])
+	var uncertain: Array[Vector2i] = []
+	uncertain.assign(split["uncertain"])
+	_board.set_path_preview(solid, uncertain)
 
 
 func _on_tile_clicked(tile: Vector2i) -> void:
-	if _setup_visible or _input_locked or _web_runtime_paused \
+	if _paused or _setup_visible or _input_locked or _web_runtime_paused \
 			or _online_action_pending or _online_animation_lock or _online_overlay_visible:
 		return
 	if online_mode:
@@ -340,19 +570,86 @@ func _handle_action_result(result: ActionResult) -> void:
 	_refresh_presentation(true)
 	if _hud != null:
 		_hud.set_status(_result_status(result))
+	var reduce_motion := _presentation_config != null and _presentation_config.reduce_motion
+	var unit_type := -1
+	if result.move_result != null:
+		var moved_unit := model.view.get_unit_at(result.move_result.final_tile)
+		if moved_unit != null:
+			unit_type = moved_unit.type
 	var tween: Tween = null
 	if result.move_result != null and result.move_result.moved:
 		tween = _board.animate_move(
 			result.move_result.unit_id,
 			result.move_result.from_tile,
-			result.move_result.final_tile
+			result.move_result.final_tile,
+			unit_type
 		)
 	if result.captured_unit != null:
+		if not reduce_motion and is_inside_tree():
+			await get_tree().create_timer(
+				float(PresentationConfig.TIMINGS["capture_hitstop_ms"]) / 1000.0
+			).timeout
+		_board.spawn_burst(
+			result.captured_unit.tile,
+			Color(1.0, 0.25, 0.2, 0.9),
+			10,
+			model.ply()
+		)
 		_board.spawn_effect(result.captured_unit.tile, Color(1.0, 0.25, 0.2, 0.85))
+		if _camera_rig != null and not reduce_motion:
+			_camera_rig.add_shake(0.05, 0.12)
 	if result.ambushed:
+		_board.spawn_burst(
+			result.ambusher_tile,
+			Color(1.0, 0.65, 0.15, 0.95),
+			12,
+			model.ply()
+		)
 		_board.spawn_effect(result.ambusher_tile, Color(1.0, 0.65, 0.15, 0.9))
+		if _camera_rig != null and not reduce_motion:
+			_camera_rig.add_shake(0.06, 0.18)
+	if result.partial_move and result.move_result != null:
+		_board.spawn_blocked(
+			result.move_result.final_tile,
+			Color(1.0, 0.72, 0.2, 0.9)
+		)
+	elif result.move_result != null and not result.moved:
+		_board.spawn_blocked(result.move_result.from_tile, Color(1.0, 0.72, 0.2, 0.9))
 	if result.recruited_unit != null:
 		_board.pulse_piece(result.recruited_unit.id)
+		_board.spawn_dust(result.recruited_unit.tile, Color(0.55, 0.72, 1.0, 0.8))
+	var action := model.last_action
+	if action is BuildBridgeAction:
+		_board.spawn_effect(
+			(action as BuildBridgeAction).target_tile,
+			Color(0.2, 0.85, 1.0, 0.85)
+		)
+	elif action is DestroyBridgeAction:
+		_board.spawn_effect(
+			(action as DestroyBridgeAction).target_tile,
+			Color(1.0, 0.55, 0.1, 0.85)
+		)
+	if result.move_result != null and result.move_result.promoted_to != -1:
+		_board.spawn_burst(
+			result.move_result.final_tile,
+			Color(1.0, 0.85, 0.3, 0.9),
+			8,
+			model.ply()
+		)
+	var focus_tile := Vector2i(-1, -1)
+	if result.captured_unit != null:
+		focus_tile = result.captured_unit.tile
+	elif result.ambushed:
+		focus_tile = result.ambusher_tile
+	elif result.move_result != null:
+		focus_tile = result.move_result.final_tile
+	elif result.recruited_unit != null:
+		focus_tile = result.recruited_unit.tile
+	elif action is BuildBridgeAction:
+		focus_tile = (action as BuildBridgeAction).target_tile
+	elif action is DestroyBridgeAction:
+		focus_tile = (action as DestroyBridgeAction).target_tile
+	_set_event_focus(focus_tile)
 	if tween != null:
 		if _hud != null:
 			_hud.refresh(model, true)
@@ -443,6 +740,13 @@ func _on_online_tile_clicked(tile: Vector2i) -> void:
 func _submit_online_action(action: GameAction) -> bool:
 	if action == null or online_session == null or _online_action_pending:
 		return false
+	_online_pending_mover_id = -1
+	_online_pending_mover_type = -1
+	if action is MoveAction and online_model != null and online_model.view != null:
+		var mover := online_model.view.known_units.get(action.unit_id) as GameUnit
+		if mover != null:
+			_online_pending_mover_id = mover.id
+			_online_pending_mover_type = int(mover.type)
 	var result := online_session.submit_action(action)
 	if not bool(result["ok"]):
 		_online_action_pending = false
@@ -486,6 +790,7 @@ func _on_online_session_started(state_model: ClientMatchState) -> void:
 
 func _begin_online_match(state_model: ClientMatchState) -> void:
 	_cancel_ai_work()
+	_close_match_menus()
 	_ai_brain = null
 	state = null
 	model = null
@@ -498,6 +803,7 @@ func _begin_online_match(state_model: ClientMatchState) -> void:
 	_hide_online_overlay()
 	_set_hud_online_mode(true)
 	_board.build(online_model.view.board)
+	_apply_presentation_quality()
 	if _camera_rig != null:
 		_camera_rig.set_side_orientation(online_model.local_player)
 		_camera_rig.set_mobile_board_bounds(_board.get_world_bounds())
@@ -525,6 +831,8 @@ func _apply_online_state(state_model: ClientMatchState) -> void:
 	if online_model == null:
 		online_model = OnlineMatchModel.new(state_model)
 	else:
+		if state_model != null and state_model.ply == 0 and online_model.ply() > 0:
+			online_model.stats.reset()
 		online_model.state = state_model
 		online_model.refresh()
 	_online_action_pending = false
@@ -620,7 +928,9 @@ func _on_online_event(event: Dictionary) -> void:
 				if int(event.get("promoted_to", -1)) != -1:
 					messages.append("%s %s promoted." % [owner_text, unit_name])
 				if from_tile.x >= 0 and final_tile.x >= 0:
-					tween = _board.animate_move(unit_id, from_tile, final_tile)
+					tween = _board.animate_move(
+						unit_id, from_tile, final_tile, unit.type
+					)
 			else:
 				messages.append("A unit moved.")
 		"capture":
@@ -628,25 +938,40 @@ func _on_online_event(event: Dictionary) -> void:
 			var owner := int(event.get("owner", GameConfig.NO_PLAYER))
 			var type := int(event.get("unit_type", -1))
 			var unit_name := _unit_type_name(type)
+			online_model.stats.note_capture(owner, online_model.local_player)
 			if owner == online_model.local_player:
 				messages.append("Your %s was captured at %s." % [unit_name, str(tile)])
 			else:
 				messages.append("You captured the opponent's %s at %s." % [unit_name, str(tile)])
 			_board.spawn_effect(tile, Color(1.0, 0.25, 0.2, 0.85))
+			if online_model.view.knowledge.is_visible(tile):
+				_board.spawn_burst(tile, Color(1.0, 0.25, 0.2, 0.9), 10, online_model.ply())
+				if _camera_rig != null \
+						and not (_presentation_config != null and _presentation_config.reduce_motion):
+					_camera_rig.add_shake(0.05, 0.12)
 		"ambush":
 			var tile := _event_tile(event.get("ambusher_tile", []))
 			var owner := int(event.get("owner", GameConfig.NO_PLAYER))
 			var ambusher_name := _unit_type_name(int(event.get("ambusher_type", -1)))
+			if owner != online_model.local_player \
+					and int(event.get("unit_id", -1)) == _online_pending_mover_id:
+				online_model.stats.note_ambush_loss(_online_pending_mover_type)
 			if owner == online_model.local_player:
 				messages.append("Your %s ambushed an enemy at %s." % [ambusher_name, str(tile)])
 			else:
 				messages.append("Ambushed by %s at %s." % [ambusher_name, str(tile)])
-			_board.spawn_effect(tile, Color(1.0, 0.65, 0.15, 0.9))
+			if online_model.view.knowledge.is_visible(tile):
+				_board.spawn_effect(tile, Color(1.0, 0.65, 0.15, 0.9))
+				_board.spawn_burst(tile, Color(1.0, 0.65, 0.15, 0.95), 12, online_model.ply())
+				if _camera_rig != null \
+						and not (_presentation_config != null and _presentation_config.reduce_motion):
+					_camera_rig.add_shake(0.06, 0.16)
 		"recruit":
 			var tile := _event_tile(event.get("tile", []))
 			var unit_name := _unit_type_name(int(event.get("unit_type", -1)))
 			messages.append("You recruited %s at %s." % [unit_name, str(tile)])
 			_board.pulse_piece(int(event.get("unit_id", -1)))
+			_board.spawn_dust(tile, Color(0.55, 0.72, 1.0, 0.8))
 		"bridge":
 			var tile := _event_tile(event.get("tile", []))
 			var mode := String(event.get("mode", ""))
@@ -654,8 +979,14 @@ func _on_online_event(event: Dictionary) -> void:
 				"A bridge was %s at %s."
 				% ["built" if mode == "build" else "destroyed", str(tile)]
 			)
+			_board.spawn_effect(
+				tile,
+				Color(0.2, 0.85, 1.0, 0.85) if mode == "build" else Color(1.0, 0.55, 0.1, 0.85)
+			)
 		"gold":
-			messages.append("You gained %d gold." % int(event.get("amount", 0)))
+			var amount := int(event.get("amount", 0))
+			online_model.stats.note_gold(amount)
+			messages.append("You gained %d gold." % amount)
 		"token_spawned":
 			messages.append("A gold token appeared at %s." % str(_event_tile(event.get("tile", []))))
 		"token_collected":
@@ -681,6 +1012,15 @@ func _on_online_event(event: Dictionary) -> void:
 				if player == online_model.local_player
 				else "Opponent requested another match."
 			)
+	var focus_tile := Vector2i(-1, -1)
+	match event_type:
+		"move":
+			focus_tile = _event_tile(event.get("final_tile", []))
+		"capture", "recruit", "bridge":
+			focus_tile = _event_tile(event.get("tile", []))
+		"ambush":
+			focus_tile = _event_tile(event.get("ambusher_tile", []))
+	_set_event_focus(focus_tile)
 	for message: String in messages:
 		online_model.append_public_log(message)
 	if tween != null:
@@ -1426,6 +1766,7 @@ func _maybe_start_ai_turn() -> void:
 	if (
 		online_mode
 		or _ai_running
+		or _paused
 		or _setup_visible
 		or _web_runtime_paused
 		or state == null
@@ -1442,6 +1783,7 @@ func _maybe_start_ai_turn() -> void:
 func _is_current_ai_turn(generation: int) -> bool:
 	return (
 		generation == _ai_generation
+		and not _paused
 		and not _setup_visible
 		and not _web_runtime_paused
 		and state != null
@@ -1454,6 +1796,7 @@ func _is_current_ai_turn(generation: int) -> bool:
 func _is_ai_generation_current(generation: int) -> bool:
 	return (
 		generation == _ai_generation
+		and not _paused
 		and not _setup_visible
 		and not _web_runtime_paused
 		and state != null
@@ -1493,6 +1836,7 @@ func _execute_ai_turn(generation: int) -> void:
 	_ai_thinking = false
 	var result: ActionResult = resolved["result"]
 	decision = resolved["decision"]
+	model.stats.note_result(result, -1, model.local_player)
 	_ai_brain.record_committed(decision)
 	model.refresh()
 	_refresh_presentation(true)
@@ -1590,7 +1934,12 @@ func _build_ai_presentation(
 			actor_name = after_actor.definition().display_name
 
 		if result.moved and before_actor != null and after_actor != null:
-			tween = _board.animate_move(move.unit_id, move.from_tile, move.final_tile)
+			tween = _board.animate_move(
+				move.unit_id,
+				move.from_tile,
+				move.final_tile,
+				before_actor.type
+			)
 
 		if result.captured_unit != null:
 			var captured_name := UnitRegistry.get_definition(
@@ -1617,6 +1966,16 @@ func _build_ai_presentation(
 					result.captured_unit.tile, Color(1.0, 0.25, 0.2, 0.85)
 				)
 
+		if result.captured_unit != null \
+				and local_view.knowledge.is_visible(result.captured_unit.tile):
+			_board.spawn_burst(
+				result.captured_unit.tile,
+				Color(1.0, 0.25, 0.2, 0.9),
+				8,
+				model.ply()
+			)
+			if _camera_rig != null:
+				_camera_rig.add_shake(0.04, 0.1)
 		if result.ambushed:
 			var ambusher := "unit"
 			if result.ambusher_type != -1:
@@ -1627,6 +1986,15 @@ func _build_ai_presentation(
 				% [ambusher, str(result.ambusher_tile)]
 			)
 			_board.spawn_effect(result.ambusher_tile, Color(1.0, 0.65, 0.15, 0.9))
+			if local_view.knowledge.is_visible(result.ambusher_tile):
+				_board.spawn_burst(
+					result.ambusher_tile,
+					Color(1.0, 0.65, 0.15, 0.95),
+					10,
+					model.ply()
+				)
+				if _camera_rig != null:
+					_camera_rig.add_shake(0.05, 0.16)
 		elif move != null:
 			if result.moved and before_actor != null and after_actor != null:
 				if result.partial_move:
@@ -1713,6 +2081,16 @@ func _build_ai_presentation(
 			)
 		else:
 			_append_unique(messages, "Game over.")
+	var focus_tile := Vector2i(-1, -1)
+	if result.captured_unit != null:
+		focus_tile = result.captured_unit.tile
+	elif result.ambushed:
+		focus_tile = result.ambusher_tile
+	elif result.move_result != null:
+		focus_tile = result.move_result.final_tile
+	elif result.recruited_unit != null:
+		focus_tile = result.recruited_unit.tile
+	_set_event_focus(focus_tile)
 	return {"messages": messages, "tween": tween}
 
 
@@ -1780,16 +2158,33 @@ func set_mobile_mode(enabled: bool) -> void:
 		if _board != null:
 			_camera_rig.set_mobile_board_bounds(_board.get_world_bounds())
 		_camera_rig.set_mobile_mode(enabled)
-	if _sun != null:
-		_sun.shadow_enabled = not enabled
-	var viewport := get_viewport()
-	if viewport != null:
-		viewport.scaling_3d_scale = 0.85 if enabled else 1.0
+	_apply_presentation_quality()
 	Engine.max_fps = 60 if enabled else 0
 	if active_model() != null:
 		_refresh_presentation(false)
 		if _hud != null and enabled:
 			_hud.set_status("Mobile controls ready.")
+
+
+func presentation_tier() -> int:
+	return _presentation_config.effective_tier \
+		if _presentation_config != null \
+		else PresentationConfig.detect_tier()
+
+
+func _apply_presentation_quality() -> void:
+	var tier := presentation_tier()
+	PresentationConfig.apply_sun(_sun, tier)
+	if _world_environment != null and _world_environment.environment != null:
+		PresentationConfig.apply_environment(_world_environment.environment, tier)
+	var viewport := get_viewport()
+	if viewport != null:
+		PresentationConfig.apply_viewport(viewport, tier)
+	if _board != null:
+		_board.set_quality_tier(tier)
+		_board.set_reduce_motion(_presentation_config != null and _presentation_config.reduce_motion)
+	if _vignette != null:
+		_vignette.set_enabled(PresentationConfig.uses_vignette(tier))
 
 
 func _on_touch_pan(delta: Vector2) -> void:
@@ -1938,6 +2333,7 @@ func _on_touch_long_press(position: Vector2) -> void:
 		)
 	if tile == BoardView.NO_TILE:
 		return
+	_update_path_preview(tile)
 	_mobile_hud.show_info_card(_build_tile_info(tile))
 
 
@@ -1950,6 +2346,9 @@ func _build_tile_info(tile: Vector2i) -> Dictionary:
 		"bridge": false,
 		"mine": false,
 		"token": false,
+		"elevation": 0,
+		"mine_cycle": -1,
+		"conceal": false,
 		"unit": {},
 	}
 	var view_model = active_model()
@@ -1964,6 +2363,8 @@ func _build_tile_info(tile: Vector2i) -> Dictionary:
 		if data != null:
 			info["terrain"] = TerrainRegistry.get_definition(data.terrain).display_name
 			info["bridge"] = data.has_bridge
+			info["elevation"] = int(data.elevation)
+			info["conceal"] = data.terrain == TerrainType.Type.FOREST
 		if online_mode:
 			info["mine"] = tile in view_model.explored_mine_tiles()
 			info["token"] = tile in view_model.visible_gold_token_tiles()
@@ -1972,6 +2373,7 @@ func _build_tile_info(tile: Vector2i) -> Dictionary:
 				if mine.tile == tile:
 					info["mine"] = true
 					info["token"] = mine.gold_available and visible
+					info["mine_cycle"] = int(mine.cycle_progress)
 					break
 	var unit: GameUnit = view_model.view.get_unit_at(tile)
 	if unit != null:
@@ -1980,6 +2382,12 @@ func _build_tile_info(tile: Vector2i) -> Dictionary:
 
 
 func handle_back_request() -> bool:
+	if _settings_panel != null and _settings_panel.is_open():
+		_settings_panel.handle_back()
+		return true
+	if _pause_menu != null and _pause_menu.is_open():
+		_pause_menu.handle_back()
+		return true
 	if _online_overlay_visible:
 		return true
 	if _setup_visible:
@@ -2050,6 +2458,9 @@ func handle_back_request() -> bool:
 		return true
 	if _mobile_hud != null and _mobile_hud.close_top_modal():
 		return true
+	if model != null and not model.is_game_over():
+		_on_pause_requested()
+		return true
 	return false
 
 
@@ -2071,17 +2482,44 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key := event as InputEventKey
 		if key.pressed and not key.echo and key.keycode == KEY_ESCAPE:
+			if _settings_panel != null and _settings_panel.is_open():
+				_settings_panel.handle_back()
+				get_viewport().set_input_as_handled()
+				return
+			if _pause_menu != null and _pause_menu.is_open():
+				_pause_menu.handle_back()
+				get_viewport().set_input_as_handled()
+				return
 			if _setup_visible:
 				_setup.handle_back()
 				get_viewport().set_input_as_handled()
 				return
 			if _input_locked or _web_runtime_paused or model == null:
 				return
-			model.cancel_recruitment()
-			model.cancel_bridge_action()
-			model.cancel_promotion()
-			model.clear_selection()
-			_refresh_presentation(false)
-			if _hud != null:
-				_hud.set_status("Selection cleared.")
+			if online_mode:
+				online_model.cancel_recruitment()
+				online_model.cancel_bridge_action()
+				online_model.cancel_promotion()
+				online_model.clear_selection()
+				_refresh_presentation(false)
+				if _hud != null:
+					_hud.set_status("Selection cleared.")
+				get_viewport().set_input_as_handled()
+				return
+			var had_selection := (
+				model.recruitment_type() != -1
+				or model.bridge_mode() != PresentationModel.BridgeMode.NONE
+				or model.has_pending_promotion()
+				or model.selected_unit_id != -1
+			)
+			if had_selection:
+				model.cancel_recruitment()
+				model.cancel_bridge_action()
+				model.cancel_promotion()
+				model.clear_selection()
+				_refresh_presentation(false)
+				if _hud != null:
+					_hud.set_status("Selection cleared.")
+			else:
+				_on_pause_requested()
 			get_viewport().set_input_as_handled()

@@ -3,7 +3,7 @@ extends HudBase
 
 const LOG_LINE_LIMIT: int = 12
 const TOAST_SECONDS: float = 3.0
-const MODAL_COLOR: Color = Color(0.04, 0.06, 0.09, 1.0)
+var MODAL_COLOR: Color = UiStyle.panel()
 const RECRUIT_ORDER: Array[int] = [
 	UnitType.Type.PAWN,
 	UnitType.Type.SCOUT,
@@ -49,6 +49,7 @@ var _info_close: Button
 var _menu_panel: PanelContainer
 var _menu_log_label: Label
 var _menu_setup_button: Button
+var _menu_settings_button: Button
 var _menu_close: Button
 var _confirm_panel: PanelContainer
 var _confirm_setup_button: Button
@@ -66,6 +67,7 @@ var _promotion_buttons: Array[Button] = []
 var _game_over_panel: PanelContainer
 var _game_over_title: Label
 var _game_over_detail: Label
+var _game_over_stat_values: Dictionary[String, Label] = {}
 var _game_over_rematch: Button
 var _game_over_setup: Button
 
@@ -302,6 +304,7 @@ func _ensure_ui() -> void:
 	_toast_timer.wait_time = TOAST_SECONDS
 	_toast_timer.timeout.connect(_on_toast_timeout)
 	add_child(_toast_timer)
+	UiStyle.apply_scrollbar_theme(self)
 
 
 func _build_top_bar() -> void:
@@ -313,8 +316,9 @@ func _build_top_bar() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", roundi(_dp(4.0)))
 	margin.add_child(column)
-	var row_one := HBoxContainer.new()
-	row_one.add_theme_constant_override("separation", roundi(_dp(6.0)))
+	var row_one := HFlowContainer.new()
+	row_one.add_theme_constant_override("h_separation", roundi(_dp(6.0)))
+	row_one.add_theme_constant_override("v_separation", roundi(_dp(2.0)))
 	column.add_child(row_one)
 	_turn_label = _label("P1 — your turn", 13.0)
 	_turn_label.name = "TurnLabel"
@@ -329,8 +333,9 @@ func _build_top_bar() -> void:
 	)
 	_gold_label.name = "GoldLabel"
 	row_one.add_child(_gold_label)
-	var row_two := HBoxContainer.new()
-	row_two.add_theme_constant_override("separation", roundi(_dp(6.0)))
+	var row_two := HFlowContainer.new()
+	row_two.add_theme_constant_override("h_separation", roundi(_dp(6.0)))
+	row_two.add_theme_constant_override("v_separation", roundi(_dp(2.0)))
 	column.add_child(row_two)
 	_draw_status_label = _label("", 12.0)
 	_draw_status_label.name = "DrawStatusLabel"
@@ -352,7 +357,7 @@ func _build_toast() -> void:
 	_toast_panel.name = "Toast"
 	_toast_panel.visible = false
 	_toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_style_panel(_toast_panel, Color(0.06, 0.09, 0.13, 0.94))
+	_style_panel(_toast_panel, Color(UiStyle.ink(), 0.94))
 	_layout.add_child(_toast_panel)
 	var margin := _margin(_toast_panel, 6.0)
 	_toast_label = _label("", 13.0)
@@ -371,22 +376,26 @@ func _build_bottom_bar() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", roundi(_dp(4.0)))
 	margin.add_child(column)
-	var main_row := HBoxContainer.new()
-	main_row.add_theme_constant_override("separation", roundi(_dp(6.0)))
+	var main_row := VBoxContainer.new()
+	main_row.add_theme_constant_override("separation", roundi(_dp(4.0)))
 	column.add_child(main_row)
 	_unit_info_label = _label("Tap a unit to select.", 13.0)
 	_unit_info_label.name = "UnitInfoLabel"
 	_unit_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_unit_info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_row.add_child(_unit_info_label)
+	var action_row := HFlowContainer.new()
+	action_row.add_theme_constant_override("h_separation", roundi(_dp(6.0)))
+	action_row.add_theme_constant_override("v_separation", roundi(_dp(4.0)))
+	main_row.add_child(action_row)
 	_recruit_button = _button("Recruit", 92.0)
 	_recruit_button.name = "RecruitButton"
 	_recruit_button.pressed.connect(_on_recruit_pressed)
-	main_row.add_child(_recruit_button)
+	action_row.add_child(_recruit_button)
 	_context_row = HBoxContainer.new()
 	_context_row.name = "ContextActions"
 	_context_row.add_theme_constant_override("separation", roundi(_dp(4.0)))
-	column.add_child(_context_row)
+	action_row.add_child(_context_row)
 	_build_button = _button("Build", 0.0)
 	_build_button.name = "BuildButton"
 	_build_button.pressed.connect(_on_build_pressed)
@@ -496,6 +505,10 @@ func _build_menu() -> void:
 	_menu_setup_button.name = "MenuSetupButton"
 	_menu_setup_button.pressed.connect(_on_menu_setup_pressed)
 	content.add_child(_menu_setup_button)
+	_menu_settings_button = _button("Settings", 0.0)
+	_menu_settings_button.name = "MenuSettingsButton"
+	_menu_settings_button.pressed.connect(_on_menu_settings_pressed)
+	content.add_child(_menu_settings_button)
 	_menu_close = _button("Close", 0.0)
 	_menu_close.name = "MenuCloseButton"
 	_menu_close.pressed.connect(close_menu)
@@ -624,8 +637,29 @@ func _build_game_over_modal() -> void:
 	_game_over_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_game_over_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_game_over_detail)
-	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", roundi(_dp(6.0)))
+	var rule := HSeparator.new()
+	column.add_child(rule)
+	var stats := GridContainer.new()
+	stats.name = "GameOverStats"
+	stats.columns = 2
+	stats.add_theme_constant_override("h_separation", roundi(_dp(20.0)))
+	stats.add_theme_constant_override("v_separation", roundi(_dp(2.0)))
+	column.add_child(stats)
+	for key: String in ["Plies", "Captures", "Gold earned", "Mines held", "Scouts lost"]:
+		var key_label := _label(key, 11.0)
+		key_label.name = "Stat%sLabel" % key.replace(" ", "")
+		key_label.add_theme_color_override("font_color", UiStyle.muted())
+		stats.add_child(key_label)
+		var value_label := _label("0", 12.0)
+		value_label.name = "Stat%sValue" % key.replace(" ", "")
+		value_label.add_theme_color_override("font_color", UiStyle.parchment())
+		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		value_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stats.add_child(value_label)
+		_game_over_stat_values[key] = value_label
+	var buttons := HFlowContainer.new()
+	buttons.add_theme_constant_override("h_separation", roundi(_dp(6.0)))
+	buttons.add_theme_constant_override("v_separation", roundi(_dp(6.0)))
 	column.add_child(buttons)
 	_game_over_rematch = _button("Rematch", 0.0)
 	_game_over_rematch.name = "GameOverRematchButton"
@@ -768,6 +802,10 @@ func _refresh_game_over() -> void:
 	else:
 		_game_over_title.text = "Game over"
 		_game_over_detail.text = ""
+	for row: Dictionary in HudFormat.game_over_stat_rows(_model):
+		var key := String(row.get("label", ""))
+		if _game_over_stat_values.has(key):
+			_game_over_stat_values[key].text = String(row.get("value", "0"))
 	if not was_visible and is_inside_tree():
 		_game_over_rematch.grab_focus()
 
@@ -906,6 +944,10 @@ func _on_menu_setup_pressed() -> void:
 		_confirm_setup_button.grab_focus()
 
 
+func _on_menu_settings_pressed() -> void:
+	settings_requested.emit()
+
+
 func _on_confirm_setup() -> void:
 	_confirm_open = false
 	_menu_open = false
@@ -949,10 +991,21 @@ func _format_info_card(info: Dictionary) -> String:
 		lines.append(
 			"Bridge: %s" % ("Yes" if bool(info.get("bridge", false)) else "No")
 		)
+		if int(info.get("elevation", 0)) > 0:
+			lines.append("Elevation: %d" % int(info.get("elevation", 0)))
+		if bool(info.get("conceal", false)):
+			lines.append("May conceal enemies: Yes")
 		if bool(info.get("mine", false)):
 			lines.append("Gold mine: Yes")
-		if bool(info.get("token", false)):
-			lines.append("Gold token: Available")
+			if int(info.get("mine_cycle", -1)) >= 0:
+				lines.append(
+					"Mine cycle: %d/%d"
+					% [int(info.get("mine_cycle", 0)), GameConfig.MINE_CYCLE_PLIES]
+				)
+			if bool(info.get("token", false)):
+				lines.append("Gold token: Available")
+			else:
+				lines.append("Gold token: Empty")
 	else:
 		lines.append("Unexplored")
 	var unit: Dictionary = info.get("unit", {})
@@ -987,6 +1040,7 @@ func _button(text: String, min_width_dp: float) -> Button:
 	button.custom_minimum_size.y = _touch()
 	if min_width_dp > 0.0:
 		button.custom_minimum_size.x = _dp(min_width_dp)
+	UiStyle.style_button(button)
 	return button
 
 
@@ -1018,14 +1072,8 @@ func _margin(parent: Control, margin_dp: float) -> MarginContainer:
 	return margin
 
 
-func _style_panel(panel: PanelContainer, color: Color = Color(0.04, 0.06, 0.09, 0.92)) -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.corner_radius_top_left = 8
-	style.corner_radius_top_right = 8
-	style.corner_radius_bottom_left = 8
-	style.corner_radius_bottom_right = 8
-	panel.add_theme_stylebox_override("panel", style)
+func _style_panel(panel: PanelContainer, color: Color = Color(-1, -1, -1, -1)) -> void:
+	UiStyle.style_panel(panel, color)
 
 
 func _dp(value: float) -> float:

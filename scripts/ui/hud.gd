@@ -1,7 +1,9 @@
 class_name MatchHud
 extends HudBase
 
-const LOG_LINE_LIMIT: int = 8
+signal log_focus_requested(tile: Vector2i)
+
+const LOG_LINE_LIMIT: int = 20
 
 var _model
 var _input_locked: bool = false
@@ -9,6 +11,8 @@ var _online_mode: bool = false
 var _promotion_was_visible: bool = false
 var _game_over_was_visible: bool = false
 var _recruit_buttons: Dictionary[int, Button] = {}
+var _last_event_tile: Vector2i = Vector2i(-1, -1)
+var _game_over_stat_values: Dictionary[String, Label] = {}
 
 @onready var _turn_label: Label = %TurnLabel
 @onready var _ply_label: Label = %PlyLabel
@@ -20,6 +24,7 @@ var _recruit_buttons: Dictionary[int, Button] = {}
 @onready var _destroy_bridge_button: Button = %DestroyBridgeButton
 @onready var _cancel_button: Button = %CancelActionButton
 @onready var _log_label: Label = %LogLabel
+@onready var _log_panel: PanelContainer = %LogPanel
 @onready var _status_label: Label = %StatusLabel
 @onready var _promotion_overlay: Control = %PromotionOverlay
 @onready var _draw_status_label: Label = %DrawStatusLabel
@@ -29,15 +34,20 @@ var _recruit_buttons: Dictionary[int, Button] = {}
 @onready var _game_over_overlay: Control = %GameOverOverlay
 @onready var _game_over_title: Label = %GameOverTitle
 @onready var _game_over_detail: Label = %GameOverDetail
+@onready var _game_over_stats: GridContainer = %GameOverStats
 @onready var _game_over_rematch_button: Button = %GameOverRematchButton
 @onready var _game_over_setup_button: Button = %GameOverSetupButton
 @onready var _return_setup_button: Button = %ReturnSetupButton
+@onready var _menu_button: Button = %MenuButton
 @onready var _setup_confirm_dialog: ConfirmationDialog = %SetupConfirmDialog
 @onready var _help_button: Button = %HelpButton
 @onready var _help_dialog: AcceptDialog = %HelpDialog
 
 
 func _ready() -> void:
+	_log_label.max_lines_visible = LOG_LINE_LIMIT
+	if _log_panel != null:
+		_log_panel.gui_input.connect(_on_log_panel_input)
 	_recruit_buttons = {
 		UnitType.Type.PAWN: %RecruitPawnButton,
 		UnitType.Type.SCOUT: %RecruitScoutButton,
@@ -71,6 +81,7 @@ func _ready() -> void:
 	_game_over_rematch_button.pressed.connect(_on_rematch_pressed)
 	_game_over_setup_button.pressed.connect(_on_setup_pressed)
 	_return_setup_button.pressed.connect(_on_setup_pressed)
+	_menu_button.pressed.connect(_on_menu_pressed)
 	_setup_confirm_dialog.confirmed.connect(_on_setup_confirmed)
 	_help_button.pressed.connect(_on_help_pressed)
 	_setup_confirm_dialog.dialog_text = (
@@ -87,6 +98,86 @@ func _ready() -> void:
 	_promotion_overlay.visible = false
 	_game_over_overlay.visible = false
 	_update_recruit_labels()
+	_apply_war_table_style()
+	_build_game_over_stats()
+
+
+func _apply_war_table_style() -> void:
+	for panel_name: String in ["TopBar", "LeftPanel", "DrawPanel", "RightPanel", "LogPanel"]:
+		var panel := get_node_or_null("%" + panel_name) as PanelContainer
+		if panel != null:
+			UiStyle.style_panel(panel, Color(UiStyle.panel(), 0.94), 10.0)
+	for overlay_path: String in [
+		"PromotionOverlay/Center/Panel",
+		"GameOverOverlay/Center/Panel",
+	]:
+		var overlay_panel := get_node_or_null(overlay_path) as PanelContainer
+		if overlay_panel != null:
+			UiStyle.style_panel(overlay_panel, Color(UiStyle.panel(), 0.98), 14.0)
+	for node: Node in find_children("*", "Button", true, false):
+		var button := node as Button
+		if button == null:
+			continue
+		button.custom_minimum_size.y = maxf(
+			button.custom_minimum_size.y, UiStyle.dp(MobileMetrics.TOUCH_TARGET_DP)
+		)
+		if button.name == "GameOverRematchButton":
+			UiStyle.style_primary_button(button)
+		elif button.name in ["SetupBackButton", "PromoteCancelButton"]:
+			UiStyle.style_quiet_button(button)
+		else:
+			UiStyle.style_button(button)
+	for node: Node in find_children("*", "Label", true, false):
+		var label := node as Label
+		if label != null:
+			label.add_theme_color_override("font_color", UiStyle.parchment())
+	for heading_path: String in [
+		"%LeftPanel/Layout/Heading",
+		"%DrawPanel/Layout/Heading",
+		"%RightPanel/Layout/Heading",
+		"%LogPanel/Layout/Heading",
+	]:
+		var heading := get_node_or_null(heading_path) as Label
+		if heading != null:
+			heading.add_theme_color_override("font_color", UiStyle.gold())
+	_status_label.add_theme_color_override("font_color", UiStyle.muted())
+	for backdrop_path: String in [
+		"PromotionOverlay/Backdrop",
+		"GameOverOverlay/Backdrop",
+	]:
+		var backdrop := get_node_or_null(backdrop_path) as ColorRect
+		if backdrop != null:
+			backdrop.color = Color(UiStyle.ink(), 0.72)
+	_game_over_title.add_theme_color_override("font_color", UiStyle.gold())
+	_game_over_detail.add_theme_color_override("font_color", UiStyle.muted())
+
+
+func _build_game_over_stats() -> void:
+	if _game_over_stats == null:
+		return
+	for key: String in ["Plies", "Captures", "Gold earned", "Mines held", "Scouts lost"]:
+		var key_label := Label.new()
+		key_label.name = "Stat%sLabel" % key.replace(" ", "")
+		key_label.text = key
+		key_label.add_theme_font_size_override("font_size", roundi(UiStyle.dp(14.0)))
+		key_label.add_theme_color_override("font_color", UiStyle.muted())
+		_game_over_stats.add_child(key_label)
+		var value_label := Label.new()
+		value_label.name = "Stat%sValue" % key.replace(" ", "")
+		value_label.text = "0"
+		value_label.add_theme_font_size_override("font_size", roundi(UiStyle.dp(14.0)))
+		value_label.add_theme_color_override("font_color", UiStyle.parchment())
+		value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		value_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_game_over_stats.add_child(value_label)
+		_game_over_stat_values[key] = value_label
+
+
+func _refresh_game_over_stats() -> void:
+	for row: Dictionary in HudFormat.game_over_stat_rows(_model):
+		var key := String(row.get("label", ""))
+		if _game_over_stat_values.has(key):
+			_game_over_stat_values[key].text = String(row.get("value", "0"))
 
 
 func refresh(model, input_locked: bool = false) -> void:
@@ -111,6 +202,8 @@ func set_online_mode(enabled: bool) -> void:
 	_online_mode = enabled
 	if _game_over_rematch_button == null:
 		return
+	if _menu_button != null:
+		_menu_button.visible = not enabled
 	if _online_mode:
 		_game_over_rematch_button.text = "Another Match"
 		_game_over_setup_button.text = "Leave Room"
@@ -171,6 +264,18 @@ func _refresh_buttons() -> void:
 		_recruit_buttons[unit_type].disabled = (
 			not can_act or not _model.can_recruit_unit(unit_type)
 		)
+
+
+func set_last_event_tile(tile: Vector2i) -> void:
+	_last_event_tile = tile
+
+
+func _on_log_panel_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse := event as InputEventMouseButton
+		if mouse.button_index == MOUSE_BUTTON_LEFT and mouse.pressed \
+				and _last_event_tile.x >= 0:
+			log_focus_requested.emit(_last_event_tile)
 
 
 func _refresh_log() -> void:
@@ -242,6 +347,7 @@ func _refresh_game_over() -> void:
 	if not _game_over_was_visible:
 		_game_over_rematch_button.grab_focus()
 	_game_over_was_visible = true
+	_refresh_game_over_stats()
 
 
 func _draw_detail_text(reason: String) -> String:
@@ -309,6 +415,10 @@ func _on_setup_pressed() -> void:
 		setup_requested.emit()
 		return
 	_setup_confirm_dialog.popup_centered()
+
+
+func _on_menu_pressed() -> void:
+	pause_requested.emit()
 
 
 func _on_setup_confirmed() -> void:

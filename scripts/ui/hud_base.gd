@@ -13,6 +13,8 @@ signal accept_draw_requested
 signal decline_draw_requested
 signal rematch_requested
 signal setup_requested
+signal pause_requested
+signal settings_requested
 
 
 func refresh(_model, _input_locked: bool = false) -> void:

@@ -2,7 +2,8 @@ class_name PieceView
 extends Node3D
 
 const COLLISION_LAYER: int = 1
-const PIECE_HEIGHT: float = 1.1
+const PIECE_HEIGHT: float = 1.35
+const VISUAL_SCALE: float = 1.35
 
 var unit_id: int = -1
 var unit_type: int = -1
@@ -10,13 +11,18 @@ var owner_player: int = -1
 var tile: Vector2i = Vector2i(-1, -1)
 
 var _visual_root: Node3D
-var _label: Label3D
+var _token_root: Node3D
+var _token_label: Label3D
 var _body: StaticBody3D
 var _collision: CollisionShape3D
+var _shadow: MeshInstance3D
+var _token_mode: bool = false
+var _selected: bool = false
+var _blob_shadow: bool = true
 
-static var _owner_materials: Dictionary[int, StandardMaterial3D] = {}
-static var _accent_material: StandardMaterial3D
-static var _dark_material: StandardMaterial3D
+static var _body_materials: Dictionary[int, StandardMaterial3D] = {}
+static var _accent_materials: Dictionary[int, StandardMaterial3D] = {}
+static var _trim_material: StandardMaterial3D
 
 
 func setup(
@@ -52,10 +58,44 @@ func update_unit(
 
 
 func play_spawn_animation() -> void:
-	_visual_root.scale = Vector3(0.6, 0.6, 0.6)
+	var root := _active_root()
+	root.scale = Vector3(0.6, 0.6, 0.6)
 	var tween := create_tween()
-	tween.tween_property(_visual_root, "scale", Vector3.ONE, 0.18) \
+	tween.tween_property(root, "scale", _root_scale(), 0.18) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+func set_token_mode(enabled: bool) -> void:
+	if enabled == _token_mode:
+		return
+	_token_mode = enabled
+	_apply_mode()
+	_apply_selection()
+
+
+func is_token_mode() -> bool:
+	return _token_mode
+
+
+func set_selected(selected: bool) -> void:
+	if selected == _selected:
+		return
+	_selected = selected
+	_apply_selection()
+
+
+func is_selected() -> bool:
+	return _selected
+
+
+func set_blob_shadow(enabled: bool) -> void:
+	_blob_shadow = enabled
+	if _shadow != null:
+		_shadow.visible = enabled
+
+
+func has_blob_shadow() -> bool:
+	return _shadow != null and _shadow.visible
 
 
 func letter() -> String:
@@ -85,7 +125,12 @@ func _ensure_nodes() -> void:
 		return
 	_visual_root = Node3D.new()
 	_visual_root.name = "Visual"
+	_visual_root.scale = Vector3.ONE * VISUAL_SCALE
 	add_child(_visual_root)
+	_token_root = Node3D.new()
+	_token_root.name = "Token"
+	_token_root.visible = false
+	add_child(_token_root)
 	_body = StaticBody3D.new()
 	_body.name = "PickBody"
 	_body.collision_layer = COLLISION_LAYER
@@ -98,6 +143,21 @@ func _ensure_nodes() -> void:
 	_collision.shape = shape
 	_collision.position = Vector3(0.0, PIECE_HEIGHT * 0.5, 0.0)
 	_body.add_child(_collision)
+	_shadow = MeshInstance3D.new()
+	_shadow.name = "BlobShadow"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(0.72, 0.72)
+	_shadow.mesh = plane
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.01, 0.015, 0.02, 0.3)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_shadow.material_override = material
+	_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_shadow.position = Vector3(0.0, 0.008, 0.0)
+	_shadow.visible = _blob_shadow
+	add_child(_shadow)
 
 
 func _update_collider_metadata() -> void:
@@ -109,126 +169,212 @@ func _update_collider_metadata() -> void:
 func _rebuild_visual() -> void:
 	for child: Node in _visual_root.get_children():
 		child.free()
-	var body_material := _owner_material(owner_player)
-	var accent := _accent()
-	_add_mesh(_cylinder(0.28, 0.28, 0.04), accent, Vector3(0.0, 0.02, 0.0))
+	for child: Node in _token_root.get_children():
+		child.free()
+	_build_full_piece()
+	_build_token()
+	_apply_mode()
+
+
+func _build_full_piece() -> void:
+	var body := _body_material(owner_player)
+	var accent := _accent_material(owner_player)
+	var trim := _trim()
+	_add_ownership_ring(_visual_root, body, accent)
 	match unit_type:
 		UnitType.Type.KING:
-			_add_mesh(_cylinder(0.16, 0.16, 0.45), body_material, Vector3(0.0, 0.245, 0.0))
-			_add_mesh(_cylinder(0.2, 0.2, 0.06), accent, Vector3(0.0, 0.47, 0.0))
-			_add_mesh(_sphere(0.13), accent, Vector3(0.0, 0.59, 0.0))
-			_add_mesh(_box(Vector3(0.06, 0.18, 0.06)), accent, Vector3(0.0, 0.77, 0.0))
-			_add_mesh(_box(Vector3(0.18, 0.06, 0.06)), accent, Vector3(0.0, 0.73, 0.0))
+			_add(_cylinder(0.13, 0.17, 0.55), body, Vector3(0.0, 0.3, 0.0))
+			_add(_cylinder(0.16, 0.16, 0.05), accent, Vector3(0.0, 0.59, 0.0))
+			_add(_sphere(0.1), body, Vector3(0.0, 0.68, 0.0))
+			_add(_box(Vector3(0.05, 0.2, 0.05)), accent, Vector3(0.0, 0.83, 0.0))
+			_add(_box(Vector3(0.17, 0.05, 0.05)), accent, Vector3(0.0, 0.8, 0.0))
 		UnitType.Type.QUEEN:
-			_add_mesh(_cone(0.2, 0.45), body_material, Vector3(0.0, 0.225, 0.0))
-			_add_mesh(_sphere(0.12), accent, Vector3(0.0, 0.52, 0.0))
-			_add_mesh(_sphere(0.05), accent, Vector3(0.0, 0.65, 0.0))
+			_add(_cone(0.17, 0.45), body, Vector3(0.0, 0.24, 0.0))
+			_add(_cylinder(0.14, 0.14, 0.04), accent, Vector3(0.0, 0.47, 0.0))
+			for index in 5:
+				var angle := TAU * float(index) / 5.0
+				_add(
+					_sphere(0.035),
+					accent,
+					Vector3(cos(angle) * 0.1, 0.53, sin(angle) * 0.1)
+				)
+			_add(_sphere(0.05), accent, Vector3(0.0, 0.6, 0.0))
 		UnitType.Type.ROOK:
-			_add_mesh(_box(Vector3(0.3, 0.38, 0.3)), body_material, Vector3(0.0, 0.19, 0.0))
-			_add_mesh(_box(Vector3(0.34, 0.06, 0.34)), accent, Vector3(0.0, 0.4, 0.0))
-			for x: float in [-0.12, 0.0, 0.12]:
-				_add_mesh(_box(Vector3(0.07, 0.1, 0.07)), accent, Vector3(x, 0.47, 0.0))
+			_add(_cylinder(0.16, 0.2, 0.44), body, Vector3(0.0, 0.24, 0.0))
+			_add(_cylinder(0.2, 0.2, 0.06), accent, Vector3(0.0, 0.48, 0.0))
+			for x: float in [-0.14, -0.05, 0.05, 0.14]:
+				_add(_box(Vector3(0.06, 0.1, 0.06)), accent, Vector3(x, 0.56, 0.0))
 		UnitType.Type.BISHOP:
-			_add_mesh(_cone(0.18, 0.44), body_material, Vector3(0.0, 0.22, 0.0))
-			_add_mesh(_sphere(0.1), accent, Vector3(0.0, 0.5, 0.0))
-			_add_mesh(
-				_box(Vector3(0.12, 0.1, 0.06)),
-				accent,
-				Vector3(0.0, 0.58, 0.0),
-				Vector3(20.0, 0.0, 0.0)
-			)
+			_add(_cone(0.16, 0.4), body, Vector3(0.0, 0.22, 0.0))
+			_add(_cylinder(0.1, 0.1, 0.04), accent, Vector3(0.0, 0.44, 0.0))
+			_add(_sphere(0.09), body, Vector3(0.0, 0.52, 0.0))
+			_add(_box(Vector3(0.1, 0.03, 0.03)), accent, Vector3(0.0, 0.53, 0.07))
+			_add(_cone(0.03, 0.1), accent, Vector3(0.0, 0.62, 0.0))
 		UnitType.Type.KNIGHT:
-			_add_mesh(_box(Vector3(0.26, 0.28, 0.32)), body_material, Vector3(0.0, 0.14, 0.0))
-			_add_mesh(
-				_box(Vector3(0.18, 0.22, 0.2)),
-				body_material,
-				Vector3(0.0, 0.34, 0.0),
-				Vector3(-15.0, 0.0, 0.0)
+			_add(_cylinder(0.18, 0.22, 0.14), body, Vector3(0.0, 0.1, 0.0))
+			_add(_box(Vector3(0.24, 0.26, 0.26)), body, Vector3(0.0, 0.27, 0.0))
+			_add(
+				_box(Vector3(0.18, 0.24, 0.2)),
+				body,
+				Vector3(0.0, 0.46, -0.02),
+				Vector3(-18.0, 0.0, 0.0)
 			)
-			_add_mesh(
-				_box(Vector3(0.18, 0.16, 0.28)),
-				accent,
-				Vector3(0.0, 0.48, 0.0),
-				Vector3(-30.0, 0.0, 0.0)
+			_add(
+				_box(Vector3(0.15, 0.14, 0.28)),
+				body,
+				Vector3(0.0, 0.55, 0.1),
+				Vector3(-28.0, 0.0, 0.0)
 			)
+			_add(_cone(0.03, 0.08), accent, Vector3(-0.05, 0.64, -0.04))
+			_add(_cone(0.03, 0.08), accent, Vector3(0.05, 0.64, -0.04))
+			_add(_box(Vector3(0.05, 0.18, 0.1)), trim, Vector3(0.0, 0.46, -0.13))
 		UnitType.Type.PAWN:
-			_add_mesh(_cylinder(0.2, 0.2, 0.06), accent, Vector3(0.0, 0.03, 0.0))
-			_add_mesh(_sphere(0.16), body_material, Vector3(0.0, 0.22, 0.0))
-			_add_mesh(_sphere(0.1), accent, Vector3(0.0, 0.4, 0.0))
+			_add(_cylinder(0.1, 0.16, 0.28), body, Vector3(0.0, 0.19, 0.0))
+			_add(_cylinder(0.13, 0.13, 0.03), accent, Vector3(0.0, 0.35, 0.0))
+			_add(_sphere(0.1), body, Vector3(0.0, 0.46, 0.0))
 		UnitType.Type.SCOUT:
-			_add_mesh(_cylinder(0.19, 0.19, 0.05), accent, Vector3(0.0, 0.025, 0.0))
-			_add_mesh(_cylinder(0.08, 0.08, 0.42), body_material, Vector3(0.0, 0.25, 0.0))
-			_add_mesh(_cone(0.11, 0.2), accent, Vector3(0.0, 0.56, 0.0))
-			_add_mesh(_torus(0.12, 0.16), accent, Vector3(0.0, 0.35, 0.0))
+			_add(_cylinder(0.06, 0.1, 0.44), body, Vector3(0.0, 0.25, 0.0))
+			_add(_cone(0.14, 0.28), accent, Vector3(0.0, 0.52, 0.0))
+			_add(_sphere(0.07), body, Vector3(0.0, 0.68, 0.0))
+			_add(_cylinder(0.012, 0.012, 0.48), trim, Vector3(-0.13, 0.3, 0.0))
+			_add(_sphere(0.04), accent, Vector3(-0.13, 0.55, 0.0))
 		UnitType.Type.ENGINEER:
-			_add_mesh(_cylinder(0.2, 0.2, 0.05), accent, Vector3(0.0, 0.025, 0.0))
-			_add_mesh(_box(Vector3(0.28, 0.22, 0.28)), body_material, Vector3(0.0, 0.15, 0.0))
-			_add_mesh(_cylinder(0.14, 0.14, 0.08), accent, Vector3(0.0, 0.3, 0.0))
-			_add_mesh(_box(Vector3(0.08, 0.12, 0.08)), accent, Vector3(0.0, 0.4, 0.0))
+			_add(_box(Vector3(0.3, 0.16, 0.26)), body, Vector3(0.0, 0.12, 0.0))
+			_add(_cylinder(0.12, 0.16, 0.22), body, Vector3(0.0, 0.31, 0.0))
+			_add(_sphere(0.09), body, Vector3(0.0, 0.47, 0.0))
+			_add(_box(Vector3(0.18, 0.16, 0.1)), trim, Vector3(0.0, 0.32, -0.16))
+			_add(_cylinder(0.012, 0.012, 0.3), trim, Vector3(0.17, 0.33, 0.02))
+			_add(_box(Vector3(0.14, 0.07, 0.07)), accent, Vector3(0.2, 0.46, 0.02))
 		_:
-			_add_mesh(_sphere(0.16), body_material, Vector3(0.0, 0.2, 0.0))
-	_label = Label3D.new()
-	_label.name = "Letter"
-	_label.text = letter()
-	_label.font_size = 48
-	_label.pixel_size = 0.005
-	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	_label.no_depth_test = false
-	_label.outline_size = 12
-	_label.outline_modulate = Color(0.0, 0.0, 0.0, 0.9)
-	_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
-	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_label.position = Vector3(0.0, 0.98, 0.0)
-	_visual_root.add_child(_label)
+			_add(_sphere(0.16), body, Vector3(0.0, 0.2, 0.0))
+func _build_token() -> void:
+	var body := _body_material(owner_player)
+	var accent := _accent_material(owner_player)
+	_add_ownership_ring(_token_root, body, accent, true)
+	_token_label = Label3D.new()
+	_token_label.name = "TokenLetter"
+	_token_label.text = letter()
+	_token_label.font_size = 64
+	_token_label.pixel_size = 0.0035
+	_token_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_token_label.outline_size = 10
+	_token_label.outline_modulate = Color(0.0, 0.0, 0.0, 0.9)
+	_token_label.position = Vector3(0.0, 0.2, 0.0)
+	_token_root.add_child(_token_label)
 
 
-func _add_mesh(
+func _add_ownership_ring(
+	parent: Node3D,
+	body: Material,
+	accent: Material,
+	flat: bool = false
+) -> void:
+	var base_height := 0.07 if flat else 0.05
+	_add(
+		_cylinder(0.3 if flat else 0.25, 0.3 if flat else 0.25, base_height),
+		body,
+		Vector3(0.0, base_height * 0.5, 0.0),
+		Vector3.ZERO,
+		parent
+	)
+	var ring_y := base_height + 0.01
+	_add(
+		_torus(0.22 if flat else 0.19, 0.29 if flat else 0.25),
+		accent,
+		Vector3(0.0, ring_y, 0.0),
+		Vector3.ZERO,
+		parent
+	)
+	if owner_player == GameConfig.Player.PLAYER_1:
+		for index in 4:
+			var angle := TAU * float(index) / 4.0
+			var notch := _add(
+				_box(Vector3(0.06, 0.025, 0.04)),
+				accent,
+				Vector3(cos(angle) * (0.26 if flat else 0.22), ring_y, sin(angle) * (0.26 if flat else 0.22)),
+				Vector3(0.0, -rad_to_deg(angle), 0.0),
+				parent
+			)
+			notch.name = "RingNotch"
+
+
+func _apply_mode() -> void:
+	if _visual_root == null:
+		return
+	_visual_root.visible = not _token_mode
+	_token_root.visible = _token_mode
+	if _shadow != null:
+		_shadow.scale = Vector3.ONE * (0.72 if _token_mode else 1.0)
+
+
+func _apply_selection() -> void:
+	var root := _active_root()
+	if root == null:
+		return
+	root.position.y = 0.12 if _selected else 0.0
+
+
+func _active_root() -> Node3D:
+	return _token_root if _token_mode else _visual_root
+
+
+func _root_scale() -> Vector3:
+	return Vector3.ONE if _token_mode else Vector3.ONE * VISUAL_SCALE
+
+
+func _add(
 	mesh: Mesh,
 	material: Material,
 	mesh_position: Vector3,
-	rotation_degrees_value: Vector3 = Vector3.ZERO
-) -> void:
+	rotation_degrees_value: Vector3 = Vector3.ZERO,
+	parent: Node3D = null
+) -> MeshInstance3D:
 	var instance := MeshInstance3D.new()
 	instance.mesh = mesh
 	instance.material_override = material
 	instance.position = mesh_position
 	instance.rotation_degrees = rotation_degrees_value
-	_visual_root.add_child(instance)
+	(parent if parent != null else _visual_root).add_child(instance)
+	return instance
 
 
-static func _owner_material(player: int) -> StandardMaterial3D:
-	if _owner_materials.has(player):
-		return _owner_materials[player]
+static func _body_material(player: int) -> StandardMaterial3D:
+	if _body_materials.has(player):
+		return _body_materials[player]
 	var material := StandardMaterial3D.new()
 	material.albedo_color = (
-		Color(0.20, 0.45, 0.95, 1.0)
+		PresentationConfig.PALETTE["light_body"]
 		if player == GameConfig.Player.PLAYER_1
-		else Color(0.90, 0.25, 0.25, 1.0)
+		else PresentationConfig.PALETTE["dark_body"]
 	)
-	material.roughness = 0.55
-	material.metallic = 0.08
-	_owner_materials[player] = material
+	material.roughness = 0.62
+	material.metallic = 0.04
+	_body_materials[player] = material
 	return material
 
 
-static func _accent() -> StandardMaterial3D:
-	if _accent_material != null:
-		return _accent_material
-	_accent_material = StandardMaterial3D.new()
-	_accent_material.albedo_color = Color(0.86, 0.86, 0.82, 1.0)
-	_accent_material.roughness = 0.5
-	_accent_material.metallic = 0.15
-	return _accent_material
+static func _accent_material(player: int) -> StandardMaterial3D:
+	if _accent_materials.has(player):
+		return _accent_materials[player]
+	var material := StandardMaterial3D.new()
+	material.albedo_color = (
+		PresentationConfig.PALETTE["player_1"]
+		if player == GameConfig.Player.PLAYER_1
+		else PresentationConfig.PALETTE["player_2"]
+	)
+	material.roughness = 0.35
+	material.metallic = 0.3
+	_accent_materials[player] = material
+	return material
 
 
-static func _dark() -> StandardMaterial3D:
-	if _dark_material != null:
-		return _dark_material
-	_dark_material = StandardMaterial3D.new()
-	_dark_material.albedo_color = Color(0.12, 0.12, 0.13, 1.0)
-	_dark_material.roughness = 0.8
-	return _dark_material
+static func _trim() -> StandardMaterial3D:
+	if _trim_material != null:
+		return _trim_material
+	_trim_material = StandardMaterial3D.new()
+	_trim_material.albedo_color = PresentationConfig.PALETTE["dark_body"]
+	_trim_material.roughness = 0.8
+	return _trim_material
 
 
 static func _cylinder(top_radius: float, bottom_radius: float, height: float) -> CylinderMesh:
@@ -268,6 +414,6 @@ static func _torus(inner_radius: float, outer_radius: float) -> TorusMesh:
 	var mesh := TorusMesh.new()
 	mesh.inner_radius = inner_radius
 	mesh.outer_radius = outer_radius
-	mesh.rings = 12
+	mesh.rings = 16
 	mesh.ring_segments = 8
 	return mesh

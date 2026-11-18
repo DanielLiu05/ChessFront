@@ -66,6 +66,34 @@ func test_tile_heights_and_materials() -> bool:
 	return true
 
 
+func test_ground_uses_subtle_checker_and_other_terrain_does_not() -> bool:
+	var ground_a := TileView.material_for_terrain(
+		TerrainType.Type.GROUND, Vector2i(4, 4)
+	).albedo_color
+	var ground_b := TileView.material_for_terrain(
+		TerrainType.Type.GROUND, Vector2i(5, 4)
+	).albedo_color
+	var ground_a_again := TileView.material_for_terrain(
+		TerrainType.Type.GROUND, Vector2i(6, 4)
+	).albedo_color
+	assert_ne(ground_a, ground_b, "adjacent ground alternates")
+	assert_eq(ground_a, ground_a_again, "ground parity repeats every two tiles")
+	assert_true(
+		absf(ground_a.r - ground_b.r) < 0.06
+		and absf(ground_a.g - ground_b.g) < 0.06
+		and absf(ground_a.b - ground_b.b) < 0.06,
+		"ground checker stays subtle"
+	)
+	var forest_a := TileView.material_for_terrain(
+		TerrainType.Type.FOREST, Vector2i(4, 4)
+	).albedo_color
+	var forest_b := TileView.material_for_terrain(
+		TerrainType.Type.FOREST, Vector2i(5, 4)
+	).albedo_color
+	assert_eq(forest_a, forest_b, "forest ignores the ground checker")
+	return true
+
+
 func test_camera_clamps_and_offset() -> bool:
 	assert_eq(CameraRig.clamp_pitch(0.0), 25.0, "minimum pitch")
 	assert_eq(CameraRig.clamp_pitch(90.0), 75.0, "maximum pitch")
