@@ -3,7 +3,7 @@
 - Last updated: 2026-11-17
 - Specification: `game-design.md` — authoritative and read-only
 - Engine: Godot 4.7.2-stable, GDScript
-- Repository: git initialized on `main`; Phase 8 commit `7da3f49` exists, later web changes are uncommitted
+- Repository: git initialized on `main`; Phase 8 commit `7da3f49` and Phase 8W/Phase 9 commit `f4fd3f0` exist; working tree clean
 - Current stage: Phase 9 (online multiplayer) is complete. P9-01 through P9-08 are implemented and verified, including the online board/lifecycle, GitHub Pages workflow, runbook and two-browser acceptance. Save/load, replay and takeback are explicitly excluded. P7-05 remains Blocked on on-device 200-ply/thermal evidence; real mobile-browser performance remains U-22, live Pages/tunnel deployment evidence remains U-20/U-26.
 
 ## Status legend
@@ -3713,5 +3713,5 @@ git status --short
 - Scope boundaries and remaining evidence:
   - No save/load, replay or takeback. No accounts, matchmaking, chat, spectators, rankings or public room browser. Native Android online is not implemented; the APK remains a regression build.
   - A live GitHub Pages deployment and a real Cloudflare quick-tunnel/phone session were not performed (no push/credentials/network session); the workflow, runbook, local `/repo/` subpath and two-browser acceptance are in place. U-20/U-26 remain open, as do P7-05 and real mobile-browser performance (U-22).
-  - `game-design.md` is unchanged. No git commits were created.
+  - `game-design.md` is unchanged. Committed as `f4fd3f0`; no push was performed.
 - Phase 9 is complete. Next: review Phase 9 and decide the next phase; persistence/replay remains deferred by user decision.
