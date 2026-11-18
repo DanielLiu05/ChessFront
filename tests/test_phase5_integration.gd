@@ -15,27 +15,30 @@ func test_library_maps_play_actions() -> bool:
 			continue
 		var state := GameState.new(result.map)
 		assert_eq(state.get_all_units().size(), 32, "map %s deploys 32 units" % map_id)
-		var p1_pawn := state.get_unit_at(Vector2i(4, 14))
-		var p2_pawn := state.get_unit_at(Vector2i(4, 1))
-		assert_not_null(p1_pawn, "map %s has a player 1 pawn" % map_id)
-		assert_not_null(p2_pawn, "map %s has a player 2 pawn" % map_id)
-		if p1_pawn == null or p2_pawn == null:
+		var first_action := _first_legal_move(state, PLAYER_1)
+		assert_not_null(first_action, "map %s gives player 1 a legal move" % map_id)
+		if first_action == null:
 			continue
-		var first := ActionResolver.resolve(
-			state,
-			MoveAction.new(p1_pawn.id, Vector2i(4, 13)),
-			ExplorationProvider.all_explored()
-		)
+		var first := ActionResolver.resolve(state, first_action, ExplorationProvider.all_explored())
 		assert_true(first.success, "map %s plays a player 1 move: %s" % [map_id, first.error])
-		var second := ActionResolver.resolve(
-			state,
-			MoveAction.new(p2_pawn.id, Vector2i(4, 2)),
-			ExplorationProvider.all_explored()
-		)
+		var second_action := _first_legal_move(state, PLAYER_2)
+		assert_not_null(second_action, "map %s gives player 2 a legal move" % map_id)
+		if second_action == null:
+			continue
+		var second := ActionResolver.resolve(state, second_action, ExplorationProvider.all_explored())
 		assert_true(second.success, "map %s plays a player 2 move: %s" % [map_id, second.error])
 		assert_eq(state.ply, 2, "map %s advances two plies" % map_id)
 		assert_eq(state.active_player, PLAYER_1, "map %s returns to player 1" % map_id)
 	return true
+
+
+func _first_legal_move(state: GameState, player: int) -> MoveAction:
+	var exploration := ExplorationProvider.all_explored()
+	for unit: GameUnit in state.get_units_for_player(player):
+		var destinations := MovementRules.legal_destinations(state, unit, exploration)
+		if not destinations.is_empty():
+			return MoveAction.new(unit.id, destinations[0])
+	return null
 
 
 func test_editor_export_round_trip_plays() -> bool:

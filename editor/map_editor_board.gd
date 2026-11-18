@@ -35,6 +35,15 @@ func set_document(value: MapDocument) -> void:
 	queue_redraw()
 
 
+func refresh() -> void:
+	_rebuild_tile_indexes()
+	queue_redraw()
+
+
+func has_mine_marker(tile: Vector2i) -> bool:
+	return _mine_tiles.has(tile)
+
+
 func set_error_tiles(tiles: Array[Vector2i]) -> void:
 	_error_tiles.clear()
 	for tile: Vector2i in tiles:

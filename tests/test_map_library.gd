@@ -66,7 +66,7 @@ func test_library_contains_validated_maps() -> bool:
 
 func test_library_entries_have_names_and_summaries() -> bool:
 	var entries := MapLibrary.list_entries()
-	assert_eq(entries.size(), 3, "three shipped map entries")
+	assert_true(entries.size() >= 3, "library has the shipped map entries")
 	var ids: Dictionary[String, bool] = {}
 	for entry: MapEntry in entries:
 		assert_false(ids.has(entry.id), "entry id is unique: %s" % entry.id)

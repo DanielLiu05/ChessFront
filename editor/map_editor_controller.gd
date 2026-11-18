@@ -217,7 +217,7 @@ func _on_tile_clicked(tile: Vector2i) -> void:
 	if not changed:
 		_update_status("Action not allowed at %s." % str(tile))
 		return
-	_board.queue_redraw()
+	_board.refresh()
 	_refresh_validation()
 	_update_status(message)
 
