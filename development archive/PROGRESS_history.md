@@ -4,7 +4,7 @@
 - Specification: `game-design.md` — authoritative and read-only
 - Engine: Godot 4.7.2-stable, GDScript
 - Repository: git initialized on `main`; Phase 8 commit `7da3f49` and Phase 8W/Phase 9 commit `f4fd3f0` exist; working tree clean
-- Current stage: Phase 9 (online multiplayer) is complete. P9-01 through P9-08 are implemented and verified, including the online board/lifecycle, GitHub Pages workflow, runbook and two-browser acceptance. Save/load, replay and takeback are explicitly excluded. P7-05 remains Blocked on on-device 200-ply/thermal evidence; real mobile-browser performance remains U-22, live Pages/tunnel deployment evidence remains U-20/U-26.
+- Current stage: Phase 9 (online multiplayer) is complete. P9-01 through P9-08 are implemented and verified, including the online board/lifecycle, GitHub Pages workflow, runbook and two-browser acceptance. Save/load, replay and takeback are explicitly excluded. The client is live on GitHub Pages at `https://DanielLiu05.github.io/ChessFront/` (Section 19.12). P7-05 remains Blocked on on-device 200-ply/thermal evidence; real mobile-browser performance remains U-22, a permanent server host remains U-20, and a real phone/tunnel session remains U-26.
 
 ## Status legend
 
@@ -1128,7 +1128,7 @@ Every ambiguity or conflict found while reading the specification is recorded he
 - **Issue:** GitHub Pages can host only static files, not the WebSocket server; the user wants Pages hosting and a server on this PC.
 - **Resolution:** Publish the single-threaded Web client to GitHub Pages (generated artifact, not committed to `main`; `.nojekyll`; relative asset paths). Run the Godot headless server and `cloudflared` on this PC; both players use the resulting `wss://` URL. Quick tunnels are testing-only (random URL, public, no SLA, no persistence). A permanent server host/domain remains U-20.
 - **Why:** Separates static client delivery from authoritative hosting, keeps Pages usable, and is honest about the quick tunnel's limits.
-- **Status:** P9-08 added `.github/workflows/pages.yml`, `.nojekyll` in the artifact, relative-path/subpath acceptance and `web/ONLINE_RUNBOOK.md`; a live Pages deployment and permanent host/domain remain U-20.
+- **Status:** P9-08 added `.github/workflows/pages.yml`, `.nojekyll` in the artifact, relative-path/subpath acceptance and `web/ONLINE_RUNBOOK.md`. The live client is deployed at `https://DanielLiu05.github.io/ChessFront/` (Section 19.12); a permanent server host/domain remains U-20.
 
 #### A-133 — Phase 9 verification boundary
 - **Issue:** Unit tests alone cannot prove authoritative networking, hidden-information isolation or browser behavior.
@@ -3712,6 +3712,20 @@ git status --short
   - Inspected screenshots: `online_lobby.png`, `online_assigned.png`, `online_match_desktop.png`, `online_match_mobile.png`, plus the two-browser match/game-over/waiting/resumed captures under `builds/web/acceptance/`.
 - Scope boundaries and remaining evidence:
   - No save/load, replay or takeback. No accounts, matchmaking, chat, spectators, rankings or public room browser. Native Android online is not implemented; the APK remains a regression build.
-  - A live GitHub Pages deployment and a real Cloudflare quick-tunnel/phone session were not performed (no push/credentials/network session); the workflow, runbook, local `/repo/` subpath and two-browser acceptance are in place. U-20/U-26 remain open, as do P7-05 and real mobile-browser performance (U-22).
+  - A real Cloudflare quick-tunnel/phone session was not performed in this batch; the workflow, runbook, local `/repo/` subpath and two-browser acceptance are in place. The live Pages deployment was completed later (Section 19.12). U-20/U-26 remain open, as do P7-05 and real mobile-browser performance (U-22).
   - `game-design.md` is unchanged. Committed as `f4fd3f0`; no push was performed.
 - Phase 9 is complete. Next: review Phase 9 and decide the next phase; persistence/replay remains deferred by user decision.
+
+### 19.12 Live GitHub Pages deployment and hosting check (2026-11-18)
+
+- Pushed `main` to `https://github.com/DanielLiu05/ChessFront` (`f4fd3f0`, `caeaf0e`, `6b5865d`). The first workflow run failed at `Configure GitHub Pages` with “Resource not accessible by integration” because Pages was not enabled and `GITHUB_TOKEN` cannot create the site. After the repository owner enabled Pages with source GitHub Actions (commit `6b5865d` added `enablement: true`), the deploy step succeeded.
+- Live client: `https://DanielLiu05.github.io/ChessFront/` (lowercase host alias 404s; use the repository-owner casing). `index.html`, `index.wasm` (HTTP 206 range) and `index.pck` are served by GitHub Pages.
+- Smoke test in the in-app browser: the exported client booted to Match setup and displayed both modes, including **Play Online**. Screenshot: `builds/web/acceptance/pages_smoke.png`.
+- Local hosting check: started the authoritative server (`ws://127.0.0.1:9000`) and `cloudflared` quick tunnel; a WebSocket client opened `wss://<quick-tunnel>.trycloudflare.com` through the tunnel, confirming the documented topology. Tunnel URLs are per-session and not recorded as stable endpoints.
+- Remaining: U-20 permanent server host/domain, U-26 real phone/tunnel session, P7-05 on-device thermal evidence, U-22 real mobile-browser performance.
+
+Post-deployment fixes found while authoring maps:
+
+- The Map Editor mine tool changed `gold_mines` but the board’s cached mine index was only rebuilt on document load, so the mine marker never appeared. The controller now calls a new `MapEditorBoard.refresh()` after a successful tile action, and `test_mine_tool_marks_board_after_click` covers add, mirror, and remove.
+- The Map Editor export preset excluded `editor/*`, which would have shipped a tool without its own code. The exclusion is removed; the game presets still exclude `editor/`.
+- Library tests assumed exactly the three shipped maps and fixed pawn tiles. They now accept additional library maps and derive a legal move from each map, so authoring new maps does not break the suite. `river_crossing2.json` is a draft (`untitled`/`Untitled Map`). Suite: **3375 assertions / 0 failures**.

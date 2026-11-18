@@ -1393,3 +1393,204 @@ No shared-screen multiplayer is included in any version.
 The standalone Map Editor is a separate tool and is never included in the game build.
 
 The MVP is successful when a player can play a complete, deterministic match against the basic AI, explore the map, compete for gold mines, recruit units, use terrain strategically and capture the opposing King or reach a draw.
+
+# 17. Phase 10 — Presentation Polish
+
+## 17.0 Scope and hard constraints
+
+Phase 10 changes only how the game looks, sounds and feels. It must not change what the game does.
+
+- No rule, balance, validation or state-semantics changes. The full Section 14 suite and the existing replay corpus must pass unchanged, with byte-identical state hashes before and after every polish slice.
+- All polish is driven by the action event stream from the resolver (Section 11.5). The presentation layer never reads authoritative state directly to decide what to draw; it reads the local player's knowledge projection.
+- Cosmetic randomness is permitted in the presentation layer only. Seed every cosmetic effect deterministically from `(ply, tile, event_type)` so replays look identical on every playback. Cosmetic randomness must never feed back into game state.
+- **Information budget is absolute.** Section 12's no-leak rule outranks every visual ambition below. Any effect that reveals a concealed unit is a defect, not a trade-off. Specifically forbidden: shadows, reflections, ambient occlusion contact darkening, bloom, rim light, particles, decals, footprints, positional audio, or music intensity derived from undetected units.
+- Concealed enemy units are culled from rendering entirely (`visible = false`, no attached lights, no audio emitters, no particle systems). Never hide a unit by fading opacity, scaling to zero, or moving it off-screen — those leave shadows and reflections behind.
+
+## 17.1 Decisions to resolve before polishing
+
+These are existing spec ambiguities that the renderer cannot resolve on its own. Decide, document in the blueprint, then polish.
+
+1. **Terrain data model.** Confirm the resolved model from the earlier review: base terrain (ground/water) + cover (forest) + elevation (0/1), with "hill" and "forest" as authoring brushes. Sections 4.2 and 14 require additive stacking, so a single exclusive terrain enum is insufficient.
+2. **Known-terrain snapshot.** Section 4.4 says explored terrain remains permanently known. Confirm that explored-but-not-visible tiles render from the player's *last-seen* terrain snapshot, including bridge state — not live state. Otherwise an enemy Engineer building a bridge in fog silently updates your map. This requires per-player known bridge state; if it is missing, treat it as a Phase 3 correctness fix, not polish.
+3. **Opponent gold privacy.** Section 12 shows gold in the HUD. If opponent gold is public, a mine payout reveals that they occupy or collected a mine. Recommended: keep it public and accept it as intended strategic intel, like material count in chess. Do not add extra leakage on top — no coin trail from a mine you cannot see.
+4. **Promotion timing.** Promotion choice is declared at commit time. The picker is therefore a pre-commit dialog, never a post-move surprise.
+
+## 17.2 Art direction
+
+Target: **a war table made physical.** A carved stone-and-turf diorama floating in a dark void, lit like a campaign map under a warm lamp. Miniature, tactile, restrained. Not realism, not neon, not flat vector.
+
+Every visual decision must survive overview zoom, where a tile is roughly 25dp on a phone. Detail that only reads at tactical zoom is decoration; silhouette, value and hue carry the game.
+
+| Role | Hue | Usage |
+|---|---|---|
+| Void / background | `#0E1218` | Space around the board, menu backdrop |
+| Surface / overlay | `#171C24` | HUD panels, cards, sheets |
+| Light army body | `#E8DCC4` | Bone/ivory piece bodies |
+| Dark army body | `#2A2F38` | Obsidian piece bodies |
+| Player A accent | `#D6453C` | Crimson base ring, banner, HUD identity |
+| Player B accent | `#3E8FD6` | Azure base ring, banner, HUD identity |
+| Forest | `#4F7A46` | Canopy, moss |
+| Hill / rock | `#8A8172` | Warm stone risers |
+| Water | `#1C3A44` | Deep teal surface |
+| Mine gold | `#F2B544` | The only amber permitted on the board |
+| Unexplored slab | `#6B7078` | Cool neutral, untextured |
+
+- Ownership is triple-encoded: body value (light/dark) + accent hue (crimson/azure) + base-ring shape (notched vs smooth). This survives colorblindness and 25dp scale.
+- Semantic colors (success `#5FBF7F`, warning `#E8A33D`, danger `#E05252`, info `#6FA8DC`) appear **only in HUD chrome**, never on board tiles. The board's hue budget is reserved for terrain and ownership.
+- Board threat indication uses shape and motion (pulsing ring, broken-shield icon), not a new color.
+
+## 17.3 Materials
+
+- One shared PBR material per terrain archetype. No per-tile material instances — 216 tiles must not mean 216 materials.
+- Pack occlusion/roughness/metallic into a single ORM texture. Two 1024² atlases (terrain, units) plus one props atlas. Total texture memory under 128 MB on mobile.
+- Albedo carries readable shape, not high-frequency noise. Fine grain turns to mud at overview zoom; bake broad value variation into vertex colors instead.
+- Metal is reserved for ownership inlay and mine hardware. Stone, turf and wood stay non-metallic with roughness 0.55–0.85.
+- No screen-space reflections anywhere. Water uses a scrolling normal map with a static sky cubemap, so it can never mirror an undetected unit.
+- Avoid transparency on the board. Use opaque or dithered materials; sorted transparency is the main overdraw cost on mobile.
+
+## 17.4 Board terrain
+
+- **Unexplored tiles render as uniform flat slabs at a single fixed height, with no props.** Never render the real hill mesh, tree meshes or water surface in grey — the silhouette alone leaks elevation, forest and water positions. This is the most likely leak in the entire polish pass.
+- **Ground:** turf with gentle vertex-color variation, sparse instanced pebbles and grass tufts via MultiMesh. Density low enough that tile boundaries stay legible (Section 9).
+- **Forest:** a single canopy-blob silhouette per tile with 2–3 trunk hints, not individual detailed trees. When a friendly or detected unit occupies a forest tile, shrink and fade the canopy so the piece is fully visible — a legally detected unit must never be hidden by decoration.
+- **Hill:** a clear one-step riser with a rock face and a lit top edge. Elevation must read at overview zoom without relying on shadow.
+- **Water:** dark, slow normal scroll, subtle shoreline foam. No scene reflections.
+- **Bridge:** obviously constructed — plank pontoon with pilings, visually distinct from natural ground, so passability is never ambiguous.
+- **Mine:** shaft head with a warm lamp, a four-segment cycle ring, and a physical gold token prop when `gold_available` is true. At overview zoom, add a billboard icon so mine state stays readable.
+- Tile grid lines are subtle but present at all zooms; they are the player's coordinate system.
+
+## 17.5 Fog rendering
+
+- Drive fog from a single 16×16 data texture (fog state, terrain id, highlight class, overlay flags) sampled by the board shader. Fog transitions are a texture interpolation, not 216 material updates.
+- Render two MultiMesh layers — blank slab and real terrain — and toggle per-instance visibility on fog-state change, with a short shader-driven reveal.
+- Three states must be distinguishable in greyscale, not just by hue: unexplored is flat, propless, cool and darkest; explored shows real terrain and props under a desaturating cool veil; visible is fully saturated and key-lit. Adjacent states differ by at least 1.5:1 in luminance **and** by a non-color cue.
+- Discovery is a moment: newly explored tiles reveal in a 250ms directional wave from the moving unit. Never animate fog with a continuous pulse — it makes state reading unreliable.
+
+## 17.6 Units
+
+- Preserve chess silhouettes exactly. A Knight must read as a Knight at 25dp. Scout reads light and tall (lantern/hood); Engineer reads stocky and burdened (hammer/pontoon).
+- Piece height ≈ 1.35 × tile width, base diameter ≈ 0.68 × tile width.
+- Two LOD tiers with hysteresis: below 36dp tile size render an iconic token (extruded piece silhouette on an ownership disc); above 48dp render the full sculpted piece. Hard swap, no crossfade.
+- Ownership base ring is always present and always readable from the fixed 60° camera pitch.
+- Selected unit lifts slightly and gains a pulsing ring. Units that have already acted are never dimmed — one action per turn makes that meaningless.
+
+## 17.7 Lighting and post
+
+- Locked mobile yaw and fixed pitch allow baked lighting. Bake LightmapGI for static terrain; do not recompute static shadows per frame.
+- One warm directional key, cool gradient ambient, subtle rim. Units use cheap blob shadows on Low/Medium mobile tiers; real shadow maps only on High and desktop.
+- Post stack: gentle bloom (mine gold and highlight markers only, never ownership accents), mild warm-highlight/cool-shadow grade, soft vignette.
+- Forbidden: motion blur, film grain over the board, depth of field at overview zoom. Optional tilt-shift DOF is desktop-High only, off by default, and must never blur highlights or unit silhouettes.
+- AA: MSAA 4× desktop, 2× mobile-High, FXAA on mobile-Low.
+
+## 17.8 Interaction feedback
+
+**Destination markers must teach Section 3.6.** This is the highest-value polish item in the phase.
+
+| Marker | Meaning |
+|---|---|
+| Solid filled | Guaranteed — path fully explored and known clear |
+| Dashed ring | Attempt — path crosses unexplored or uncertain tiles; may stop short or trigger ambush |
+| Crosshair | Capture of a detected enemy |
+| Frontier tick | The first uncertain tile along a ray |
+
+Hover (desktop) and long-press-drag (mobile) preview the path, solid up to the frontier and dashed beyond.
+
+| Event | Timing | Treatment |
+|---|---|---|
+| Move | 200ms + 40ms/tile, cap 420ms | Ease-out slide, terrain-aware footfall dust |
+| Knight jump | 260ms | Arc, landing impact |
+| Capture | 60ms hitstop | Captured piece topples into motes; weighty audio |
+| Partial move | On stop | Blocked impact, "unknown obstruction" marker on the blocking tile, toast: *Stopped short — turn used* |
+| No-progress Knight | 250ms | Bounce-back, invalid-destination marker, toast: *Turn used* |
+| Ambush | 120ms slow + 350ms reveal | Mover shatters, camera micro-shake, ambusher revealed with type icon and tile callout, persistent log entry |
+| Recruit | 350ms | Piece rises with a dust ring |
+| Bridge build / destroy | 450ms | Planks assemble / collapse with splash |
+| Promotion | 500ms | Transform after pre-commit choice |
+| Gold payout | 500ms | Coin motes to HUD counter **only if the mine tile is visible to you** |
+| Turn change | 400ms | Banner sweep, subtle light temperature shift, mobile haptic |
+
+Camera shake amplitude ≤ 0.6% of viewport, duration ≤ 180ms, disabled by Reduce Motion. Never shake the camera for an opponent action you cannot see.
+
+## 17.9 UI
+
+- **Type:** chiseled display serif for headings, clean sans for UI, tabular numerals for gold and ply counters. Ship a CJK-capable fallback (Noto Sans SC) and test string expansion at 150% text scale.
+- **Layout:** portrait top bar (turn, ply remaining, both golds, connection, menu); bottom bar (selected-unit card, Recruit, Draw). Desktop uses a side rail with the same components. All interactive UI respects safe-area insets and 44dp minimum targets.
+- **Unit card:** glyph, movement diagram, vision radius, capture capability, and *currently applied* modifiers ("Forest: vision 2 → 1", "Water: vision −1"). This is where the rules become learnable.
+- **Tile card (long-press / right-click):** terrain, elevation, fog state, mine cycle and token, known bridge state, and "may conceal enemies" for forest.
+- **Action log:** last 20 events with icons; tapping focuses the camera. Essential online and for understanding ambush.
+- **Opponent move replay:** animate their move only if both origin and destination were visible to you at the time. Otherwise show a neutral "opponent acted" cue. Never animate hidden movement.
+- **King threat indicator:** pulsing ring computed only from detected enemies, listing known attackers. It warns; it never blocks a move (Section 7).
+- **Draw offer:** non-blocking banner with accept/decline; consumes no turn.
+- **Online chrome:** connection pill, opponent-thinking indicator, turn timer ring, rejoin and disconnect states.
+- **Menus:** setup (mode, map, side, first player), map picker with pre-rendered thumbnails shipped as assets, pause, settings, game over with match stats (plies, captures, gold earned, mines held, scouts lost to ambush) and rematch.
+- **Replay viewer:** scrubber, ply stepping, speed control, and a side selector that renders either player's knowledge. Label it clearly as post-match full information.
+- Style every scrollable region's scrollbar in the palette; no browser/engine default tracks.
+
+## 17.10 Audio
+
+- Restrained war-table palette: wood and stone clicks, cloth, low strings. Every sound is tied to a visible event.
+- **Music intensity is computed from the local player's knowledge only.** A score that swells because a hidden enemy is near is an information leak.
+- Ambience is positional to *known terrain* only — wind, forest birds, water lapping. Never attach audio to undetected units; no footsteps for moves you cannot see.
+- Distinct cues for select, move per terrain, capture, ambush (the sharpest sting in the game), gold, recruit, bridge, promotion, turn, victory, defeat, draw.
+- One always-visible mute-all control showing current state, plus master/music/SFX sliders, persisted. Handle mobile audio focus and backgrounding.
+
+## 17.11 Accessibility
+
+- Colorblind palettes for deuteranopia, protanopia and tritanopia; ownership remains distinguishable via ring shape and body value.
+- Reduce Motion: disables shake, hitstop, reveal waves and long animations; state changes stay instant and legible.
+- Text scale 100/125/150%; minimum 14sp body on mobile.
+- Full keyboard and gamepad tile-cursor navigation on desktop.
+- Haptics on mobile with a toggle.
+- Greyscale test: fog states, ownership and highlight classes must all remain distinguishable with color removed.
+
+## 17.12 Performance and quality tiers
+
+| | Low | Medium | High |
+|---|---|---|---|
+| Unit shadows | Blob | Blob | Real-time |
+| Post | Grade only | + bloom | + vignette, DOF (desktop) |
+| Prop density | 25% | 60% | 100% |
+| Water shader | Static | Scroll | Scroll + foam |
+| MSAA | Off/FXAA | 2× | 4× |
+| Render scale | 0.75 | 1.0 | 1.0 |
+
+- Auto-detect tier by device, allow manual override, persist the choice.
+- Budgets on the named target device: 60fps during camera motion and animations, 30fps floor, under 150 draw calls and 250k triangles on mobile, framebuffer capped near 2.2M pixels.
+- Idle at 15fps between actions; 60fps during interaction; stop rendering when backgrounded.
+- Reuse geometry and materials; instance all props through MultiMesh; never rebuild meshes per frame.
+
+## 17.13 Map editor parity
+
+The editor must preview terrain using the same shared material definitions as the game, with a "game view" toggle showing fog states and ownership colors. Authors cannot judge readability in flat debug colors. Validation errors stay overlaid on affected tiles. Editor code remains excluded from all game exports.
+
+## 17.14 Do not
+
+No screen-space reflections. No depth of field at overview. No motion blur or grain over the board. No per-tile materials. No opacity-faded hidden units. No particles, decals or audio from undetected units. No bloom on ownership accents. No pulsing fog. No high-frequency albedo noise. No camera shake for invisible events.
+
+---
+
+# 18. Phase 10 Acceptance and Testing
+
+**Regression gate.** Full Section 14 suite plus the replay corpus pass unchanged; state hashes byte-identical to pre-polish.
+
+**Leak audit (automated).** Across a full scripted match, assert for every ply: no concealed enemy node is visible, no concealed enemy shadow caster is enabled, no concealed enemy audio emitter is active, and no UI or music signal derives from concealed state. Add a manual greyscale-and-silhouette pass over all four terrain types in all three fog states.
+
+**Readability gate.** On a 5-inch phone at overview zoom, five new players identify ownership, unit type and fog state within one second at ≥90% accuracy.
+
+**Comprehension gate.** Five external players complete a match unassisted and can afterwards explain: attempt vs guaranteed destinations, why a partial move cost a turn, what an ambush was, and when a mine pays out.
+
+**Performance gate.** Named mid-range device plus a small-screen phone: frame budgets hold through a full 120-ply match with no thermal throttling; resize, backgrounding, rejoin and replay restart are stable; no duplicated listeners, timers or loops after ten consecutive matches.
+
+**Final refinement.** After the gates pass, fix the single worst remaining finding from the readability test before declaring Phase 10 complete.
+
+---
+
+# 19. Phase 10 Coding Agent Instructions
+
+- Implement in slices, each leaving the build runnable: materials and terrain → units → lighting and fog → interaction feedback → UI → audio → performance and accessibility.
+- Run the regression gate after every slice. A polish change that alters a rules test is a bug in the polish, not a reason to update the test.
+- Resolve Section 17.1 with the human before starting; do not silently pick a behavior.
+- Do not modify the rules engine, validator, economy or map format to make an effect easier.
+- Keep all polish constants (timings, palette, tier thresholds, LOD sizes) in centralized configuration, not scattered through scripts.
+- Every effect must degrade gracefully: if a tier or platform cannot support it, the information it carried must still be conveyed by a cheaper cue.
+- Update the README and technical documentation with the palette, tier table and event-to-effect mapping.
