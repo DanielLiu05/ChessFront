@@ -69,6 +69,8 @@ func _initialize() -> void:
 		_fail("Online controls are incomplete")
 		_finish()
 		return
+	if not url.visible or url.size.y < MobileMetrics.touch_target_ui() - 1.0:
+		_fail("The server URL field is not visible on the connect page")
 
 	url.text = "not a server url"
 	connect_button.pressed.emit()

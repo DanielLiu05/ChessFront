@@ -160,17 +160,11 @@ func _ensure_ui() -> void:
 	_status_label.add_theme_color_override("font_color", MUTED_COLOR)
 	add_child(_status_label)
 
-	var scroll := ScrollContainer.new()
-	scroll.name = "OnlineScroll"
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
 	var content := VBoxContainer.new()
 	content.name = "OnlineContent"
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", roundi(_dp(8.0)))
-	scroll.add_child(content)
+	add_child(content)
 
 	_url_row = HBoxContainer.new()
 	_url_row.name = "OnlineUrlRow"

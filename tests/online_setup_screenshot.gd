@@ -1,6 +1,7 @@
 extends SceneTree
 
 const PORTRAIT_SIZE: Vector2i = Vector2i(1080, 2400)
+const CONNECT_PATH: String = "user://online_connect.png"
 const LOBBY_PATH: String = "user://online_lobby.png"
 const ASSIGNED_PATH: String = "user://online_assigned.png"
 
@@ -38,6 +39,7 @@ func _initialize() -> void:
 	setup.find_child("SetupPrimaryButton", true, false).pressed.emit()
 	await process_frame
 	await process_frame
+	var error := await _save(viewport, CONNECT_PATH)
 	client.connect_to_url("https://example.trycloudflare.com")
 	client.poll(0.0)
 	transport.push(NetProtocol.MessageType.WELCOME, {"protocol_version": NetProtocol.PROTOCOL_VERSION})
@@ -50,7 +52,7 @@ func _initialize() -> void:
 	client.poll(0.0)
 	await process_frame
 	await process_frame
-	var error := await _save(viewport, LOBBY_PATH)
+	error = _merge(error, await _save(viewport, LOBBY_PATH))
 	transport.push(NetProtocol.MessageType.MATCH_STARTED, {
 		"room": _room(OnlineRoomState.Phase.MATCH, true, true, "borderlands", PLAYER_1),
 		"assignment": _assignment(PLAYER_1, PLAYER_1),

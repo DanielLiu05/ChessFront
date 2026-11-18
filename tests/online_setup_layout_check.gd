@@ -66,15 +66,16 @@ func _check_size(size: Vector2i, insets: SafeInsets) -> void:
 		Vector2(size.x - insets.left - insets.right, size.y - insets.top - insets.bottom)
 	)
 	var panel_rect := panel.get_global_rect()
-	if not safe.encloses(panel_rect):
-		_fail("Online panel is outside the safe area at %s: %s" % [str(size), str(panel_rect)])
-	var scroll := panel.find_child("OnlineScroll", true, false) as ScrollContainer
+	if panel_rect.position.x < safe.position.x - 0.5 \
+			or panel_rect.end.x > safe.end.x + 0.5:
+		_fail("Online panel is outside the safe width at %s: %s" % [str(size), str(panel_rect)])
+	var scroll := setup.find_child("SetupPageScroll", true, false) as ScrollContainer
 	if scroll == null:
-		_fail("No online scroll at %s" % str(size))
+		_fail("No online page scroll at %s" % str(size))
 	else:
 		var scroll_rect := scroll.get_global_rect()
 		if not safe.encloses(scroll_rect):
-			_fail("Online scroll is outside the safe area at %s: %s" % [str(size), str(scroll_rect)])
+			_fail("Online page scroll is outside the safe area at %s: %s" % [str(size), str(scroll_rect)])
 	var minimum := MobileMetrics.touch_target_ui()
 	var controls := 0
 	for node: Node in panel.find_children("*", "Control", true, false):
