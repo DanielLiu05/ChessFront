@@ -68,6 +68,23 @@ func test_safe_area_container_applies_test_insets() -> bool:
 	return true
 
 
+func test_web_metrics_use_css_pixels_and_device_ratio() -> bool:
+	PlatformMode.set_test_overrides(-1, 1, 0)
+	MobileMetrics.clear_dpi_override()
+	WebViewport.set_test_pixel_ratio(1.0)
+	assert_eq(MobileMetrics.screen_dpi(), 160.0, "web DPR 1 uses the reference DPI")
+	assert_eq(MobileMetrics.touch_target_ui(), 44.0, "44dp is 44 CSS pixels")
+	assert_eq(MobileMetrics.dp_to_ui(520.0), 520.0, "setup width is not browser-shrunk")
+	WebViewport.set_test_pixel_ratio(2.0)
+	assert_eq(MobileMetrics.screen_dpi(), 320.0, "web DPI scales with devicePixelRatio")
+	assert_eq(MobileMetrics.touch_target_ui(), 88.0, "44 CSS px is 88 canvas units at DPR 2")
+	assert_eq(MobileMetrics.dp_to_ui(520.0), 1040.0, "setup width scales to CSS pixels")
+	WebViewport.clear_test_pixel_ratio()
+	PlatformMode.clear_test_overrides()
+	MobileMetrics.clear_dpi_override()
+	return true
+
+
 func test_mobile_project_settings() -> bool:
 	assert_eq(
 		int(ProjectSettings.get_setting("display/window/handheld/orientation", -1)),

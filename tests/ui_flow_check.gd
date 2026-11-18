@@ -86,6 +86,7 @@ func _run_flow(controller: MatchController) -> void:
 		push_error("Could not reset the match")
 		return
 	await process_frame
+	MovementTestUtils.clear_gold(controller.state)
 	controller.state.add_gold(PLAYER_1, 1)
 	controller._refresh_presentation(false)
 	hud.recruit_requested.emit(UnitType.Type.PAWN)
@@ -179,6 +180,7 @@ func _run_flow(controller: MatchController) -> void:
 
 	var pass_state := GameState.new(standard.map)
 	MovementTestUtils.clear_units(pass_state)
+	MovementTestUtils.clear_gold(pass_state)
 	MovementTestUtils.reset_knowledge(pass_state)
 	_assign_state(controller, pass_state, board)
 	await process_frame

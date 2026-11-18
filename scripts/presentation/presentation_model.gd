@@ -407,8 +407,40 @@ func decline_draw() -> bool:
 	return true
 
 
+func has_state() -> bool:
+	return state != null
+
+
+func is_game_over() -> bool:
+	return state != null and state.game_over
+
+
+func game_winner() -> int:
+	return state.winner if state != null else GameConfig.NO_PLAYER
+
+
+func game_draw_reason() -> String:
+	return state.draw_reason if state != null else ""
+
+
+func active_player() -> int:
+	return int(state.active_player) if state != null else GameConfig.NO_PLAYER
+
+
+func ply() -> int:
+	return state.ply if state != null else 0
+
+
+func turn_limit_plies() -> int:
+	return state.turn_limit_plies if state != null else GameConfig.DEFAULT_TURN_LIMIT_PLIES
+
+
+func draw_offered_by() -> int:
+	return state.draw_offered_by if state != null else GameConfig.NO_PLAYER
+
+
 func gold(player: int) -> int:
-	return state.get_gold(player)
+	return state.get_gold(player) if state != null else 0
 
 
 func local_occupied_mine_count() -> int:

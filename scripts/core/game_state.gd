@@ -226,7 +226,7 @@ func _create_gold_mines(map: MapData) -> void:
 
 func _initialize_gold() -> void:
 	for player: int in [GameConfig.Player.PLAYER_1, GameConfig.Player.PLAYER_2]:
-		player_gold[player] = 0
+		player_gold[player] = GameConfig.STARTING_GOLD
 
 
 func _store_deployment(map: MapData) -> void:

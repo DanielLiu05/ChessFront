@@ -61,8 +61,8 @@ func _test_setup_first_boot() -> void:
 		_fail("Match HUDs should be hidden during setup")
 	if _setup.page_index() != int(MatchSetup.Page.MODE):
 		_fail("Setup should start on the mode page")
-	if _setup.mode_count() != 1:
-		_fail("Setup should offer exactly one mode")
+	if _setup.mode_count() != 2:
+		_fail("Setup should offer the AI and online modes")
 	if _setup.map_count() < 3:
 		_fail("Setup should list the shipped map library")
 	if _setup.selected_mode_id() != "vs_ai":

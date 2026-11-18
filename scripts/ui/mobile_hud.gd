@@ -13,8 +13,9 @@ const RECRUIT_ORDER: Array[int] = [
 	UnitType.Type.ROOK,
 ]
 
-var _model: PresentationModel
+var _model
 var _input_locked: bool = false
+var _online_mode: bool = false
 var _ui_built: bool = false
 
 var _safe_area: SafeAreaContainer
@@ -83,11 +84,11 @@ func _ready() -> void:
 	_ensure_ui()
 
 
-func refresh(model: PresentationModel, input_locked: bool = false) -> void:
+func refresh(model, input_locked: bool = false) -> void:
 	_ensure_ui()
 	_model = model
 	_input_locked = input_locked
-	if _model == null or _model.state == null:
+	if _model == null or not _model.has_state():
 		return
 	_refresh_top_bar()
 	_refresh_bottom_bar()
@@ -108,6 +109,23 @@ func set_status(message: String) -> void:
 			_toast_timer.stop()
 		else:
 			_toast_timer.start(TOAST_SECONDS)
+
+
+func set_online_mode(enabled: bool) -> void:
+	_online_mode = enabled
+	_ensure_ui()
+	if _game_over_rematch == null:
+		return
+	if _online_mode:
+		_game_over_rematch.text = "Another Match"
+		_game_over_setup.text = "Leave Room"
+		_menu_setup_button.text = "Leave Room"
+		_confirm_setup_button.text = "Leave Room"
+	else:
+		_game_over_rematch.text = "Rematch"
+		_game_over_setup.text = "Return to Setup"
+		_menu_setup_button.text = "Return to Setup"
+		_confirm_setup_button.text = "Return to Setup"
 
 
 func set_test_safe_insets(insets: SafeInsets) -> void:
@@ -157,7 +175,7 @@ func is_info_card_open() -> bool:
 
 func open_menu() -> bool:
 	_ensure_ui()
-	if _model == null or _model.state == null:
+	if _model == null or not _model.has_state():
 		return false
 	_close_transient_modals("menu")
 	_menu_open = true
@@ -201,7 +219,7 @@ func is_recruit_sheet_open() -> bool:
 
 func open_draw_modal() -> void:
 	_ensure_ui()
-	if _model == null or _model.state == null:
+	if _model == null or not _model.has_state():
 		return
 	_draw_suppressed = false
 	_close_transient_modals("draw")
@@ -302,10 +320,13 @@ func _build_top_bar() -> void:
 	_turn_label.name = "TurnLabel"
 	_turn_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row_one.add_child(_turn_label)
-	_ply_label = _label("Ply 0 / 120", 13.0)
+	_ply_label = _label("Ply 0 / %d" % GameConfig.DEFAULT_TURN_LIMIT_PLIES, 13.0)
 	_ply_label.name = "PlyLabel"
 	row_one.add_child(_ply_label)
-	_gold_label = _label("Gold P1 0 · P2 0", 13.0)
+	_gold_label = _label(
+		"Gold P1 %d · P2 %d" % [GameConfig.STARTING_GOLD, GameConfig.STARTING_GOLD],
+		13.0
+	)
 	_gold_label.name = "GoldLabel"
 	row_one.add_child(_gold_label)
 	var row_two := HBoxContainer.new()
@@ -619,29 +640,31 @@ func _build_game_over_modal() -> void:
 
 
 func _refresh_top_bar() -> void:
-	var state := _model.state
-	if state.game_over:
-		if not state.draw_reason.is_empty():
-			_turn_label.text = "Draw — %s" % HudFormat.draw_reason_text(state.draw_reason)
+	var game_over: bool = _model.is_game_over()
+	var draw_reason: String = _model.game_draw_reason()
+	var active: int = _model.active_player()
+	if game_over:
+		if not draw_reason.is_empty():
+			_turn_label.text = "Draw — %s" % HudFormat.draw_reason_text(draw_reason)
 		else:
 			_turn_label.text = _model.winner_text()
-	elif int(state.active_player) == _model.local_player:
-		_turn_label.text = "P%d — your turn" % state.active_player
+	elif active == _model.local_player:
+		_turn_label.text = "Your turn" if _online_mode else "P%d — your turn" % active
 	else:
-		_turn_label.text = "%s — waiting" % _model.short_side_label(state.active_player)
-	_ply_label.text = "Ply %d/%d" % [state.ply, state.turn_limit_plies]
+		_turn_label.text = "%s — waiting" % _model.short_side_label(active)
+	_ply_label.text = "Ply %d/%d" % [_model.ply(), _model.turn_limit_plies()]
 	_gold_label.text = _model.gold_summary()
-	if state.game_over and not state.draw_reason.is_empty():
-		_draw_status_label.text = "Draw: %s." % HudFormat.draw_reason_text(state.draw_reason)
+	if game_over and not draw_reason.is_empty():
+		_draw_status_label.text = "Draw: %s." % HudFormat.draw_reason_text(draw_reason)
 	elif _model.draw_offered_by_local():
 		_draw_status_label.text = "Draw offered — waiting."
 	elif _model.incoming_draw_offer():
 		_draw_status_label.text = "Opponent offers a draw."
 	else:
 		_draw_status_label.text = ""
-	var incoming := _model.incoming_draw_offer() and not state.game_over
+	var incoming: bool = _model.incoming_draw_offer() and not game_over
 	_draw_button.disabled = (
-		state.game_over
+		game_over
 		or _input_locked
 		or (not incoming and not _model.can_offer_draw())
 	)
@@ -650,14 +673,14 @@ func _refresh_top_bar() -> void:
 
 
 func _refresh_bottom_bar() -> void:
-	var can_act := _model.can_interact() and not _input_locked
+	var can_act: bool = _model.can_interact() and not _input_locked
 	if _model.recruitment_type() != -1:
 		_unit_info_label.text = "Recruit mode — tap a highlighted deployment tile."
 	elif _model.bridge_mode() != PresentationModel.BridgeMode.NONE:
 		_unit_info_label.text = "Bridge mode — tap a highlighted target."
 	else:
 		_unit_info_label.text = HudFormat.unit_compact(_model.selected_unit_info())
-	var selected := _model.selected_unit()
+	var selected: GameUnit = _model.selected_unit()
 	_build_button.visible = (
 		selected != null and not _model.bridge_build_targets.is_empty()
 	)
@@ -696,7 +719,7 @@ func _refresh_recruit_sheet() -> void:
 
 
 func _refresh_draw() -> void:
-	var incoming := _model.incoming_draw_offer() and not _model.state.game_over
+	var incoming: bool = _model.incoming_draw_offer() and not _model.is_game_over()
 	if not incoming:
 		_draw_suppressed = false
 		if _draw_open:
@@ -709,7 +732,7 @@ func _refresh_draw() -> void:
 
 func _refresh_promotion() -> void:
 	var was_visible := _promotion_visible
-	_promotion_visible = _model.has_pending_promotion() and not _model.state.game_over
+	_promotion_visible = _model.has_pending_promotion() and not _model.is_game_over()
 	if _promotion_visible and not was_visible:
 		_menu_open = false
 		_info_open = false
@@ -723,7 +746,7 @@ func _refresh_promotion() -> void:
 
 func _refresh_game_over() -> void:
 	var was_visible := _game_over_visible
-	_game_over_visible = _model.state.game_over
+	_game_over_visible = _model.is_game_over()
 	if not _game_over_visible:
 		return
 	if not was_visible:
@@ -732,14 +755,14 @@ func _refresh_game_over() -> void:
 		_recruit_open = false
 		_draw_open = false
 		_confirm_open = false
-	if not _model.state.draw_reason.is_empty():
+	if not _model.game_draw_reason().is_empty():
 		_game_over_title.text = "Draw"
-		_game_over_detail.text = HudFormat.draw_detail_text(_model.state.draw_reason)
-	elif _model.state.winner != GameConfig.NO_PLAYER:
+		_game_over_detail.text = HudFormat.draw_detail_text(_model.game_draw_reason())
+	elif _model.game_winner() != GameConfig.NO_PLAYER:
 		_game_over_title.text = _model.winner_text()
 		_game_over_detail.text = (
 			"The enemy King was captured."
-			if _model.state.winner == _model.local_player
+			if _model.game_winner() == _model.local_player
 			else "Your King was captured."
 		)
 	else:
@@ -750,9 +773,9 @@ func _refresh_game_over() -> void:
 
 
 func _refresh_menu() -> void:
-	if _model == null or _model.state == null:
+	if _model == null or not _model.has_state():
 		return
-	var entries := _model.log_entries()
+	var entries: Array[String] = _model.log_entries()
 	if entries.is_empty():
 		_menu_log_label.text = "No actions yet."
 	else:
@@ -821,7 +844,7 @@ func _on_menu_pressed() -> void:
 
 
 func _on_draw_pressed() -> void:
-	if _model == null or _model.state == null:
+	if _model == null or not _model.has_state():
 		return
 	if _model.incoming_draw_offer():
 		open_draw_modal()
@@ -875,7 +898,7 @@ func _on_draw_decline_pressed() -> void:
 
 
 func _on_menu_setup_pressed() -> void:
-	if _model == null or _model.state == null:
+	if _model == null or not _model.has_state():
 		return
 	_confirm_open = true
 	_update_modal_visibility()

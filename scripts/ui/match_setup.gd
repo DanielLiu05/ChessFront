@@ -2,11 +2,13 @@ class_name MatchSetup
 extends Control
 
 signal start_requested(config: MatchConfig)
+signal online_match_started(assignment: Dictionary)
 
 enum Page {
 	MODE,
 	MAP,
 	OPTIONS,
+	ONLINE,
 }
 
 const BG_COLOR: Color = Color(0.035, 0.05, 0.075, 1.0)
@@ -40,6 +42,9 @@ var _panel: PanelContainer
 var _mode_page: VBoxContainer
 var _map_page: VBoxContainer
 var _options_page: VBoxContainer
+var _online_page: VBoxContainer
+var _online_panel: OnlineSetupPanel
+var _online_client: OnlineClient = OnlineClient.new()
 var _mode_list: VBoxContainer
 var _map_list: VBoxContainer
 var _mode_description: Label
@@ -124,6 +129,26 @@ func mode_count() -> int:
 	return _modes.size()
 
 
+func online_client() -> OnlineClient:
+	return _online_client
+
+
+func online_panel() -> OnlineSetupPanel:
+	_ensure_ui()
+	return _online_panel
+
+
+func set_online_client(client: OnlineClient) -> void:
+	_online_client = client
+	if _online_panel != null and client != null:
+		_online_panel.bind_client(client)
+
+
+func selected_mode_is_online() -> bool:
+	var mode := _mode_for_id(_selected_mode_id)
+	return mode != null and not mode.uses_ai()
+
+
 func map_count() -> int:
 	return _maps.size()
 
@@ -152,6 +177,11 @@ func error_text() -> String:
 
 func handle_back() -> bool:
 	_ensure_ui()
+	if _page == Page.ONLINE:
+		if _online_panel != null and _online_panel.handle_back():
+			return true
+		_set_page(Page.MODE)
+		return true
 	if _page == Page.OPTIONS:
 		_set_page(Page.MAP)
 		return true
@@ -171,6 +201,10 @@ func go_to_map_page() -> void:
 
 func go_to_options_page() -> void:
 	_set_page(Page.OPTIONS)
+
+
+func go_to_online_page() -> void:
+	_set_page(Page.ONLINE)
 
 
 func select_mode(mode_id: String) -> void:
@@ -265,6 +299,18 @@ func _ensure_ui() -> void:
 	column.add_child(_map_page)
 	_options_page = _build_options_page()
 	column.add_child(_options_page)
+	_online_page = VBoxContainer.new()
+	_online_page.name = "SetupOnlinePage"
+	_online_page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_online_page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_child(_online_page)
+	_online_panel = OnlineSetupPanel.new()
+	_online_panel.name = "OnlineSetupPanel"
+	_online_panel.back_requested.connect(_on_online_back_requested)
+	_online_panel.match_started.connect(_on_online_match_started)
+	_online_page.add_child(_online_panel)
+	if _online_client != null:
+		_online_panel.bind_client(_online_client)
 
 	_error_label = _label("", 12.0)
 	_error_label.name = "SetupErrorLabel"
@@ -375,7 +421,7 @@ func _reload_data() -> void:
 	_rebuild_mode_buttons()
 	_rebuild_map_buttons()
 	if _selected_mode_id.is_empty() and not _modes.is_empty():
-		_selected_mode_id = _modes[0].id
+		_selected_mode_id = _default_mode_id()
 	if _selected_map_id.is_empty() and not _maps.is_empty():
 		_selected_map_id = _maps[0].id
 
@@ -419,7 +465,7 @@ func _apply_presets(config: MatchConfig) -> void:
 		if config.first_player == int(GameConfig.opponent(_human_player)):
 			_first_is_human = false
 	if _selected_mode_id.is_empty() and not _modes.is_empty():
-		_selected_mode_id = _modes[0].id
+		_selected_mode_id = _default_mode_id()
 	if _selected_map_id.is_empty() and not _maps.is_empty():
 		_selected_map_id = _maps[0].id
 
@@ -434,11 +480,16 @@ func _refresh() -> void:
 	_mode_page.visible = _page == Page.MODE
 	_map_page.visible = _page == Page.MAP
 	_options_page.visible = _page == Page.OPTIONS
-	_step_label.text = "Step %d of 3 — %s" % [
-		int(_page) + 1,
-		["Mode", "Map", "Side and first move"][int(_page)],
-	]
-	_back_button.visible = _page != Page.MODE
+	_online_page.visible = _page == Page.ONLINE
+	if _page == Page.ONLINE:
+		_step_label.text = "Server and room"
+	else:
+		_step_label.text = "Step %d of 3 — %s" % [
+			int(_page) + 1,
+			["Mode", "Map", "Side and first move"][int(_page)],
+		]
+	_back_button.visible = _page != Page.MODE and _page != Page.ONLINE
+	_primary_button.visible = _page != Page.ONLINE
 	_primary_button.text = "Start Match" if _page == Page.OPTIONS else "Continue"
 	_refresh_buttons()
 	_refresh_summary_and_error()
@@ -485,6 +536,10 @@ func _refresh_buttons() -> void:
 
 
 func _refresh_summary_and_error() -> void:
+	if _page == Page.ONLINE:
+		_error_label.text = ""
+		_error_label.visible = false
+		return
 	var config := current_config()
 	_summary_label.text = config.summary_text()
 	var errors: Array[String] = []
@@ -504,7 +559,10 @@ func _on_primary_pressed() -> void:
 		return
 	match _page:
 		Page.MODE:
-			_set_page(Page.MAP)
+			if selected_mode_is_online():
+				_set_page(Page.ONLINE)
+			else:
+				_set_page(Page.MAP)
 		Page.MAP:
 			_set_page(Page.OPTIONS)
 		Page.OPTIONS:
@@ -528,6 +586,10 @@ func _focus_current_page() -> void:
 			target = _map_buttons.get(_selected_map_id)
 		Page.OPTIONS:
 			target = _side_buttons.get(_human_player)
+		Page.ONLINE:
+			if _online_panel != null:
+				_online_panel.focus_first()
+			return
 	if target != null and target.visible:
 		target.grab_focus()
 
@@ -553,6 +615,23 @@ func _mode_for_id(mode_id: String) -> MatchModeDefinition:
 		if mode.id == mode_id:
 			return mode
 	return null
+
+
+func _default_mode_id() -> String:
+	for mode: MatchModeDefinition in _modes:
+		if mode.id == "vs_ai":
+			return mode.id
+	if _modes.is_empty():
+		return ""
+	return _modes[0].id
+
+
+func _on_online_back_requested() -> void:
+	_set_page(Page.MODE)
+
+
+func _on_online_match_started(assignment: Dictionary) -> void:
+	online_match_started.emit(assignment)
 
 
 func _map_for_id(map_id: String) -> MapEntry:

@@ -15,8 +15,8 @@ func test_mobile_hud_top_and_bottom_refresh() -> bool:
 	var info := hud.find_child("UnitInfoLabel", true, false) as Label
 	var recruit := hud.find_child("RecruitButton", true, false) as Button
 	assert_true(turn != null and turn.text.contains("your turn"), "top bar shows the local turn")
-	assert_true(ply != null and ply.text == "Ply 0/120", "top bar shows ply and limit")
-	assert_true(gold != null and gold.text == "Gold P1 0 · P2 0", "top bar shows both gold totals")
+	assert_true(ply != null and ply.text == "Ply 0/200", "top bar shows ply and limit")
+	assert_true(gold != null and gold.text == "Gold P1 2 · P2 2", "top bar shows both gold totals")
 	assert_true(info != null and info.text.contains("Tap a unit"), "empty selection prompt")
 	assert_true(recruit != null and not recruit.disabled, "recruit is available with deployment space")
 	model.select_unit_at(Vector2i(4, 14))
@@ -36,7 +36,7 @@ func test_mobile_hud_ai_labels_and_lifecycle_buttons() -> bool:
 	hud.refresh(model)
 	var gold := hud.find_child("GoldLabel", true, false) as Label
 	var turn := hud.find_child("TurnLabel", true, false) as Label
-	assert_eq(gold.text, "Gold You 0 · AI 0", "AI-mode gold label")
+	assert_eq(gold.text, "Gold You 2 · AI 2", "AI-mode gold label")
 	model.select_unit_at(Vector2i(4, 14))
 	model.move_selected_to(Vector2i(4, 13))
 	hud.refresh(model)

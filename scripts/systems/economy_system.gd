@@ -1,7 +1,6 @@
 class_name EconomySystem
 extends RefCounted
 
-const CYCLE_ACTIONS: int = 4
 const GOLD_PER_CYCLE: int = 1
 
 
@@ -23,7 +22,7 @@ static func advance_mines(state: GameState, report: EconomyReport) -> void:
 		if mine.gold_available:
 			continue
 		mine.cycle_progress += 1
-		if mine.cycle_progress < CYCLE_ACTIONS:
+		if mine.cycle_progress < GameConfig.MINE_CYCLE_PLIES:
 			continue
 		var occupant := state.get_mine_occupant(mine)
 		if occupant != null:

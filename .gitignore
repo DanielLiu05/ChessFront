@@ -5,6 +5,10 @@
 # Export artifacts
 /builds/
 
+# Local browser-acceptance tooling
+node_modules/
+web/package-lock.json
+
 # OS junk
 .DS_Store
 Thumbs.db

@@ -6,22 +6,23 @@ const MAP_PATH: String = "res://maps/standard_template.json"
 const TERRAIN_MAP_PATH: String = "res://maps/terrain_showcase.json"
 
 
-func test_players_start_with_zero_gold() -> bool:
+func test_players_start_with_configured_gold() -> bool:
 	var state := _deployed_state()
 	assert_not_null(state, "state built")
 	if state == null:
 		return true
-	assert_eq(state.get_gold(PLAYER_1), 0, "player 1 starts at zero gold")
-	assert_eq(state.get_gold(PLAYER_2), 0, "player 2 starts at zero gold")
+	assert_eq(state.get_gold(PLAYER_1), GameConfig.STARTING_GOLD, "player 1 starts with configured gold")
+	assert_eq(state.get_gold(PLAYER_2), GameConfig.STARTING_GOLD, "player 2 starts with configured gold")
+	assert_eq(state.get_gold(PLAYER_1), 2, "starting gold is two")
 	state.add_gold(PLAYER_1, 5)
-	assert_eq(state.get_gold(PLAYER_1), 5, "gold can be added")
+	assert_eq(state.get_gold(PLAYER_1), 7, "gold can be added")
 	assert_true(state.spend_gold(PLAYER_1, 2), "gold can be spent")
-	assert_eq(state.get_gold(PLAYER_1), 3, "spending deducts gold")
-	assert_false(state.spend_gold(PLAYER_1, 4), "insufficient gold is rejected")
-	assert_eq(state.get_gold(PLAYER_1), 3, "failed spend leaves gold unchanged")
+	assert_eq(state.get_gold(PLAYER_1), 5, "spending deducts gold")
+	assert_false(state.spend_gold(PLAYER_1, 6), "insufficient gold is rejected")
+	assert_eq(state.get_gold(PLAYER_1), 5, "failed spend leaves gold unchanged")
 	assert_false(state.spend_gold(PLAYER_1, -1), "negative spend is rejected")
 	state.add_gold(PLAYER_1, -5)
-	assert_eq(state.get_gold(PLAYER_1), 3, "negative add is ignored")
+	assert_eq(state.get_gold(PLAYER_1), 5, "negative add is ignored")
 	return true
 
 

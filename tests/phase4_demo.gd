@@ -40,7 +40,7 @@ func _show_recruitment() -> void:
 	)
 	print("Mines: %s" % _mine_summary(state))
 	_check(result.success, "rook recruitment succeeds")
-	_check(state.get_gold(PLAYER_1) == 0, "rook price is deducted")
+	_check(state.get_gold(PLAYER_1) == 2, "rook price is deducted from the raised total")
 	_check(state.get_unit_at(Vector2i(3, 14)) != null, "rook is deployed")
 
 
@@ -61,19 +61,21 @@ func _show_occupied_mine() -> void:
 	_log_action("Move 1", MoveAction.new(p1_knight.id, Vector2i(7, 6)), _resolve(state, MoveAction.new(p1_knight.id, Vector2i(7, 6))))
 	_log_action("Move 2", MoveAction.new(p2_knight.id, Vector2i(7, 2)), _resolve(state, MoveAction.new(p2_knight.id, Vector2i(7, 2))))
 	_log_action("Move 3", MoveAction.new(p1_knight.id, Vector2i(8, 8)), _resolve(state, MoveAction.new(p1_knight.id, Vector2i(8, 8))))
-	var fourth_action := MoveAction.new(p2_knight.id, Vector2i(8, 4))
-	var fourth := _resolve(state, fourth_action)
-	_log_action("Move 4", fourth_action, fourth)
+	_log_action("Move 4", MoveAction.new(p2_knight.id, Vector2i(8, 4)), _resolve(state, MoveAction.new(p2_knight.id, Vector2i(8, 4))))
+	_log_action("Move 5", MoveAction.new(p1_knight.id, Vector2i(7, 6)), _resolve(state, MoveAction.new(p1_knight.id, Vector2i(7, 6))))
+	var sixth_action := MoveAction.new(p2_knight.id, Vector2i(7, 2))
+	var sixth := _resolve(state, sixth_action)
+	_log_action("Move 6", sixth_action, sixth)
 
 	print(
-		"Gold after 4 actions: P1=%d P2=%d"
+		"Gold after 6 actions: P1=%d P2=%d"
 		% [state.get_gold(PLAYER_1), state.get_gold(PLAYER_2)]
 	)
 	print("Mines: %s" % _mine_summary(state))
 	_check(state.get_gold(PLAYER_1) == 1, "occupant owner receives the payout")
 	_check(state.get_gold(PLAYER_2) == 0, "other player receives nothing")
-	_check(int(fourth.gold_gained.get(PLAYER_1, 0)) == 1, "payout is reported")
-	_check(fourth.tokens_spawned.has(MINE_B), "unoccupied mine token is reported")
+	_check(int(sixth.gold_gained.get(PLAYER_1, 0)) == 1, "payout is reported")
+	_check(sixth.tokens_spawned.has(MINE_B), "unoccupied mine token is reported")
 
 
 func _show_tokens_and_pause() -> void:
@@ -81,13 +83,13 @@ func _show_tokens_and_pause() -> void:
 	var state := _empty_terrain_state()
 	if state == null:
 		return
-	for step in range(1, 5):
+	for step in range(1, 7):
 		var pass_action := PassAction.new()
 		var result := _resolve(state, pass_action)
-		if step == 4:
-			_log_action("Pass 4", pass_action, result)
+		if step == 6:
+			_log_action("Pass 6", pass_action, result)
 		_check(result.success, "pass %d succeeds" % step)
-	print("After 4 actions: %s" % _mine_summary(state))
+	print("After 6 actions: %s" % _mine_summary(state))
 	_check(state.get_gold_mine_at(MINE_A).gold_available, "mine A token appears")
 	_check(state.get_gold_mine_at(MINE_B).gold_available, "mine B token appears")
 
@@ -141,6 +143,7 @@ func _empty_terrain_state() -> GameState:
 	if state == null:
 		return null
 	MovementTestUtils.clear_units(state)
+	MovementTestUtils.clear_gold(state)
 	MovementTestUtils.reset_knowledge(state)
 	return state
 

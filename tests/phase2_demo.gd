@@ -151,6 +151,7 @@ func _empty_terrain_state() -> GameState:
 		return null
 	var state := GameState.new(result.map)
 	MovementTestUtils.clear_units(state)
+	MovementTestUtils.clear_gold(state)
 	MovementTestUtils.reset_knowledge(state)
 	return state
 

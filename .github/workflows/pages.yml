@@ -1,0 +1,76 @@
+name: Publish Web client to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/pages.yml"
+      - "export_presets.cfg"
+      - "project.godot"
+      - "web/**"
+      - "scenes/**"
+      - "scripts/**"
+      - "resources/**"
+      - "maps/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.2 and web export templates
+        run: |
+          set -euo pipefail
+          GODOT_VERSION="4.7.2-stable"
+          GODOT_ZIP="Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          TEMPLATE_PACK="Godot_v${GODOT_VERSION}_export_templates.tpz"
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}"
+          curl -fsSL -o godot.zip "${BASE}/${GODOT_ZIP}"
+          unzip -q godot.zip
+          chmod +x "Godot_v${GODOT_VERSION}_linux.x86_64"
+          sudo mv "Godot_v${GODOT_VERSION}_linux.x86_64" /usr/local/bin/godot
+          curl -fsSL -o templates.tpz "${BASE}/${TEMPLATE_PACK}"
+          mkdir -p "${HOME}/.local/share/godot/export_templates/4.7.2.stable"
+          unzip -q templates.tpz -d templates
+          mv templates/templates/* "${HOME}/.local/share/godot/export_templates/4.7.2.stable/"
+          godot --version
+
+      - name: Import project and export the Web build
+        run: |
+          set -euo pipefail
+          mkdir -p builds/web
+          godot --headless --path . --import
+          godot --headless --path . --export-release "Web" builds/web/index.html
+          touch builds/web/.nojekyll
+          ls -lh builds/web
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the static client artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: builds/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

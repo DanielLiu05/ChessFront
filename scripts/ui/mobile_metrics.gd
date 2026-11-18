@@ -18,6 +18,8 @@ static func clear_dpi_override() -> void:
 static func screen_dpi() -> float:
 	if _dpi_override > 0.0:
 		return _dpi_override
+	if PlatformMode.is_web_runtime():
+		return REFERENCE_DPI * WebViewport.device_pixel_ratio()
 	var dpi := DisplayServer.screen_get_dpi()
 	return dpi if dpi > 0.0 else REFERENCE_DPI
 

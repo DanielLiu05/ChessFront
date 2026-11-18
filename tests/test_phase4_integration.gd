@@ -18,8 +18,8 @@ func test_recruitment_mine_cycle_and_snapshot() -> bool:
 	assert_eq(first.get_gold(PLAYER_2), 0, "player 2 has no gold")
 	assert_eq(first.get_units_for_player(PLAYER_1).size(), 1, "recruited unit persists")
 	assert_eq(first.get_units_for_player(PLAYER_1)[0].type, UnitType.Type.PAWN, "recruited type")
-	assert_eq(first.active_player, PLAYER_1, "four actions return to player 1")
-	assert_eq(first.ply, 4, "four plies are completed")
+	assert_eq(first.active_player, PLAYER_1, "six actions return to player 1")
+	assert_eq(first.ply, 6, "six plies are completed")
 
 	var snapshot := first.snapshot()
 	var gold: Dictionary = snapshot["player_gold"]
@@ -27,7 +27,7 @@ func test_recruitment_mine_cycle_and_snapshot() -> bool:
 	var mines: Array = snapshot["gold_mines"]
 	assert_eq(mines.size(), 2, "snapshot records both mines")
 	for entry: Dictionary in mines:
-		assert_true(entry["gold_available"], "fourth action created a token")
+		assert_true(entry["gold_available"], "sixth action created a token")
 		assert_eq(int(entry["cycle_progress"]), 0, "token pauses the cycle")
 	assert_eq(first.snapshot_text(), second.snapshot_text(), "sequence is deterministic")
 	return true
@@ -37,6 +37,7 @@ func _run_sequence() -> GameState:
 	var state := _terrain_state()
 	if state == null:
 		return null
+	MovementTestUtils.clear_gold(state)
 	state.add_gold(PLAYER_1, 1)
 	var recruit := _resolve(state, RecruitAction.new(UnitType.Type.PAWN, SPAWN_TILE))
 	if not recruit.success:
@@ -53,7 +54,15 @@ func _run_sequence() -> GameState:
 		return state
 	var pass_four := _resolve(state, PassAction.new())
 	if not pass_four.success:
-		push_error("Final pass failed")
+		push_error("Fourth action pass failed")
+		return state
+	var move_five := _resolve(state, MoveAction.new(pawn.id, Vector2i(3, 12)))
+	if not move_five.success:
+		push_error("Second recruited pawn move failed")
+		return state
+	var pass_six := _resolve(state, PassAction.new())
+	if not pass_six.success:
+		push_error("Sixth action pass failed")
 	return state
 
 
@@ -64,6 +73,7 @@ func _terrain_state() -> GameState:
 		return null
 	var state := GameState.new(result.map)
 	MovementTestUtils.clear_units(state)
+	MovementTestUtils.clear_gold(state)
 	MovementTestUtils.reset_knowledge(state)
 	return state
 

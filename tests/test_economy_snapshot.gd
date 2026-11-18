@@ -46,12 +46,12 @@ func test_identical_games_have_identical_snapshots() -> bool:
 	assert_not_null(second, "second state built")
 	if first == null or second == null:
 		return true
-	for _step in range(4):
+	for _step in range(6):
 		assert_true(_resolve(first, PassAction.new()).success, "first pass")
 		assert_true(_resolve(second, PassAction.new()).success, "second pass")
 	assert_eq(first.snapshot_text(), second.snapshot_text(), "identical games snapshot identically")
 	for mine: GoldMine in first.gold_mines:
-		assert_true(mine.gold_available, "fourth action creates a token")
+		assert_true(mine.gold_available, "sixth action creates a token")
 		assert_eq(mine.cycle_progress, 0, "token pauses the cycle")
 	return true
 
@@ -63,6 +63,7 @@ func _terrain_state() -> GameState:
 		return null
 	var state := GameState.new(result.map)
 	MovementTestUtils.clear_units(state)
+	MovementTestUtils.clear_gold(state)
 	MovementTestUtils.reset_knowledge(state)
 	return state
 

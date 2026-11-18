@@ -15,9 +15,13 @@ signal rematch_requested
 signal setup_requested
 
 
-func refresh(_model: PresentationModel, _input_locked: bool = false) -> void:
+func refresh(_model, _input_locked: bool = false) -> void:
 	pass
 
 
 func set_status(_message: String) -> void:
+	pass
+
+
+func set_online_mode(_enabled: bool) -> void:
 	pass

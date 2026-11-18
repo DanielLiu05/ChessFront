@@ -4,9 +4,11 @@ extends RefCounted
 const MODE_DIRECTORY: String = "res://resources/match_modes"
 const BUILT_IN_MODE_PATHS: Array[String] = [
 	"res://resources/match_modes/vs_ai.tres",
+	"res://resources/match_modes/online_pvp.tres",
 ]
 const BUILT_IN_MODES: Array = [
 	preload("res://resources/match_modes/vs_ai.tres"),
+	preload("res://resources/match_modes/online_pvp.tres"),
 ]
 
 

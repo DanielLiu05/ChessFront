@@ -18,7 +18,7 @@ func test_turn_limit_is_configurable() -> bool:
 		GameConfig.DEFAULT_TURN_LIMIT_PLIES,
 		"default turn limit comes from config"
 	)
-	assert_eq(GameConfig.DEFAULT_TURN_LIMIT_PLIES, 120, "default turn limit is 120 plies")
+	assert_eq(GameConfig.DEFAULT_TURN_LIMIT_PLIES, 200, "default turn limit is 200 plies")
 	var short_state := GameState.new(result.map, 4)
 	assert_eq(short_state.turn_limit_plies, 4, "constructor overrides the turn limit")
 	var snapshot := short_state.snapshot()
@@ -32,6 +32,7 @@ func test_turn_limit_draw_after_configured_plies() -> bool:
 	if state == null:
 		return true
 	MovementTestUtils.clear_units(state)
+	MovementTestUtils.clear_gold(state)
 	MovementTestUtils.reset_knowledge(state)
 	var final := ActionResult.new()
 	for step in range(1, 5):

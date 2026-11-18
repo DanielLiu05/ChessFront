@@ -29,14 +29,14 @@ func test_pass_creates_tokens_then_collection_starts_new_cycle() -> bool:
 	assert_not_null(state, "state built")
 	if state == null:
 		return true
-	var fourth := ActionResult.new()
-	for step in range(1, 5):
+	var sixth := ActionResult.new()
+	for step in range(1, 7):
 		var result := _resolve(state, PassAction.new())
 		assert_true(result.success, "pass %d succeeds" % step)
-		if step < 4:
+		if step < 6:
 			assert_eq(state.get_gold_mine_at(MINE_A).cycle_progress, step, "cycle advances on pass")
 		else:
-			fourth = result
+			sixth = result
 	var mine_a := state.get_gold_mine_at(MINE_A)
 	var mine_b := state.get_gold_mine_at(MINE_B)
 	assert_true(mine_a.gold_available, "mine A token appears")
@@ -44,7 +44,7 @@ func test_pass_creates_tokens_then_collection_starts_new_cycle() -> bool:
 	assert_eq(mine_a.cycle_progress, 0, "mine A pauses")
 	assert_eq(mine_b.cycle_progress, 0, "mine B pauses")
 	assert_eq(state.get_gold(PLAYER_1), 0, "tokens are not gold yet")
-	assert_eq(fourth.tokens_spawned.size(), 2, "fourth action reports both tokens")
+	assert_eq(sixth.tokens_spawned.size(), 2, "sixth action reports both tokens")
 
 	for _step in range(2):
 		assert_true(_resolve(state, PassAction.new()).success, "pass with paused tokens succeeds")
@@ -64,7 +64,7 @@ func test_pass_creates_tokens_then_collection_starts_new_cycle() -> bool:
 	return true
 
 
-func test_occupied_mine_pays_on_fourth_action() -> bool:
+func test_occupied_mine_pays_on_sixth_action() -> bool:
 	var state := _terrain_state()
 	assert_not_null(state, "state built")
 	if state == null:
@@ -81,8 +81,10 @@ func test_occupied_mine_pays_on_fourth_action() -> bool:
 	assert_true(_resolve(state, MoveAction.new(p1_knight.id, Vector2i(7, 6))).success, "move 1")
 	assert_true(_resolve(state, MoveAction.new(p2_knight.id, Vector2i(7, 2))).success, "move 2")
 	assert_true(_resolve(state, MoveAction.new(p1_knight.id, Vector2i(8, 8))).success, "move 3")
-	var fourth := _resolve(state, MoveAction.new(p2_knight.id, Vector2i(8, 4)))
-	assert_true(fourth.success, "move 4")
+	assert_true(_resolve(state, MoveAction.new(p2_knight.id, Vector2i(8, 4))).success, "move 4")
+	assert_true(_resolve(state, MoveAction.new(p1_knight.id, Vector2i(7, 6))).success, "move 5")
+	var sixth := _resolve(state, MoveAction.new(p2_knight.id, Vector2i(7, 2)))
+	assert_true(sixth.success, "move 6")
 
 	var mine_a := state.get_gold_mine_at(MINE_A)
 	var mine_b := state.get_gold_mine_at(MINE_B)
@@ -90,8 +92,8 @@ func test_occupied_mine_pays_on_fourth_action() -> bool:
 	assert_eq(state.get_gold(PLAYER_2), 0, "action owner is not paid")
 	assert_eq(mine_a.cycle_progress, 0, "paid mine resets")
 	assert_true(mine_b.gold_available, "unoccupied mine creates a token")
-	assert_eq(int(fourth.gold_gained.get(PLAYER_1, 0)), 1, "payout is reported")
-	assert_true(fourth.tokens_spawned.has(MINE_B), "token spawn is reported")
+	assert_eq(int(sixth.gold_gained.get(PLAYER_1, 0)), 1, "payout is reported")
+	assert_true(sixth.tokens_spawned.has(MINE_B), "token spawn is reported")
 	return true
 
 
@@ -174,6 +176,7 @@ func _terrain_state() -> GameState:
 		return null
 	var state := GameState.new(result.map)
 	MovementTestUtils.clear_units(state)
+	MovementTestUtils.clear_gold(state)
 	MovementTestUtils.reset_knowledge(state)
 	return state
 

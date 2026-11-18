@@ -154,7 +154,9 @@ func _deployed_state() -> GameState:
 	if not result.is_valid():
 		push_error("Could not load recruitment test map: %s" % str(result.errors))
 		return null
-	return GameState.new(result.map)
+	var state := GameState.new(result.map)
+	MovementTestUtils.clear_gold(state)
+	return state
 
 
 func _resolve(state: GameState, action: GameAction) -> ActionResult:

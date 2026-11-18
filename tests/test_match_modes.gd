@@ -3,25 +3,33 @@ extends TestCase
 
 func test_shipped_mode_is_data_driven_and_enabled() -> bool:
 	var built_in := MatchModeRegistry.built_in_modes()
-	assert_eq(built_in.size(), 1, "one statically referenced shipped mode")
-	assert_eq(built_in[0].id, "vs_ai", "built-in mode is Play vs AI")
+	assert_eq(built_in.size(), 2, "two statically referenced shipped modes")
+	assert_eq(built_in[0].id, "vs_ai", "first built-in mode is Play vs AI")
+	assert_eq(built_in[1].id, "online_pvp", "second built-in mode is Play Online")
 	assert_true(
 		built_in[0].resource_path.ends_with("resources/match_modes/vs_ai.tres"),
 		"built-in mode keeps its resource path"
 	)
 	var paths := MatchModeRegistry.list_paths()
-	assert_eq(paths.size(), 1, "one shipped mode resource")
+	assert_eq(paths.size(), 2, "two shipped mode resources")
 	var modes := MatchModeRegistry.get_enabled_modes()
-	assert_eq(modes.size(), 1, "one enabled mode")
-	if modes.is_empty():
+	assert_eq(modes.size(), 2, "two enabled modes")
+	var ai_mode := MatchModeRegistry.get_mode("vs_ai")
+	assert_not_null(ai_mode, "AI mode is registered")
+	if ai_mode == null:
 		return true
-	var mode := modes[0]
-	assert_eq(mode.id, "vs_ai", "mode id")
-	assert_eq(mode.display_name, "Play vs AI", "mode display name")
-	assert_true(mode.enabled, "mode is enabled")
-	assert_true(mode.uses_ai(), "mode uses the AI opponent")
-	assert_false(mode.description.is_empty(), "mode has a description")
-	assert_eq(MatchModeRegistry.get_mode("vs_ai").id, "vs_ai", "get_mode finds the mode")
+	assert_eq(ai_mode.display_name, "Play vs AI", "AI mode display name")
+	assert_true(ai_mode.enabled, "AI mode is enabled")
+	assert_true(ai_mode.uses_ai(), "AI mode uses the AI opponent")
+	assert_false(ai_mode.description.is_empty(), "AI mode has a description")
+	var online_mode := MatchModeRegistry.get_mode("online_pvp")
+	assert_not_null(online_mode, "online mode is registered")
+	if online_mode == null:
+		return true
+	assert_eq(online_mode.display_name, "Play Online", "online mode display name")
+	assert_true(online_mode.enabled, "online mode is enabled")
+	assert_false(online_mode.uses_ai(), "online mode uses a human opponent")
+	assert_false(online_mode.description.is_empty(), "online mode has a description")
 	assert_null(MatchModeRegistry.get_mode("missing_mode"), "unknown mode is rejected")
 	assert_true(MatchModeRegistry.registry_errors().is_empty(), "shipped registry is valid")
 	return true

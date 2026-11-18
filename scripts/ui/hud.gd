@@ -3,8 +3,9 @@ extends HudBase
 
 const LOG_LINE_LIMIT: int = 8
 
-var _model: PresentationModel
+var _model
 var _input_locked: bool = false
+var _online_mode: bool = false
 var _promotion_was_visible: bool = false
 var _game_over_was_visible: bool = false
 var _recruit_buttons: Dictionary[int, Button] = {}
@@ -88,10 +89,10 @@ func _ready() -> void:
 	_update_recruit_labels()
 
 
-func refresh(model: PresentationModel, input_locked: bool = false) -> void:
+func refresh(model, input_locked: bool = false) -> void:
 	_model = model
 	_input_locked = input_locked
-	if _model == null or _model.state == null:
+	if _model == null or not _model.has_state():
 		return
 	_refresh_top_bar()
 	_refresh_unit_info()
@@ -106,18 +107,38 @@ func set_status(message: String) -> void:
 	_status_label.text = message
 
 
+func set_online_mode(enabled: bool) -> void:
+	_online_mode = enabled
+	if _game_over_rematch_button == null:
+		return
+	if _online_mode:
+		_game_over_rematch_button.text = "Another Match"
+		_game_over_setup_button.text = "Leave Room"
+		_return_setup_button.text = "Leave Room"
+		_setup_confirm_dialog.dialog_text = "Leave the online room? The match will be abandoned."
+	else:
+		_game_over_rematch_button.text = "Rematch"
+		_game_over_setup_button.text = "Return to Setup"
+		_return_setup_button.text = "Return to Setup"
+		_setup_confirm_dialog.dialog_text = (
+			"Return to match setup? The current match will be left."
+		)
+
+
 func _refresh_top_bar() -> void:
-	var state := _model.state
-	if state.game_over:
-		if not state.draw_reason.is_empty():
-			_turn_label.text = "Draw: %s" % _draw_reason_text(state.draw_reason)
+	var game_over: bool = _model.is_game_over()
+	var draw_reason: String = _model.game_draw_reason()
+	var active: int = _model.active_player()
+	if game_over:
+		if not draw_reason.is_empty():
+			_turn_label.text = "Draw: %s" % _draw_reason_text(draw_reason)
 		else:
 			_turn_label.text = _model.winner_text()
-	elif int(state.active_player) == _model.local_player:
-		_turn_label.text = "Your turn — Player %d" % state.active_player
+	elif active == _model.local_player:
+		_turn_label.text = "Your turn" if _online_mode else "Your turn — Player %d" % active
 	else:
-		_turn_label.text = "%s's turn — waiting" % _model.side_label(state.active_player)
-	_ply_label.text = "Ply %d / %d" % [state.ply, state.turn_limit_plies]
+		_turn_label.text = "%s's turn — waiting" % _model.side_label(active)
+	_ply_label.text = "Ply %d / %d" % [_model.ply(), _model.turn_limit_plies()]
 	_gold_label.text = _model.gold_summary()
 	_income_label.text = "Mines %d" % _model.local_occupied_mine_count()
 
@@ -127,9 +148,9 @@ func _refresh_unit_info() -> void:
 
 
 func _refresh_buttons() -> void:
-	var can_act := _model.can_interact() and not _input_locked
+	var can_act: bool = _model.can_interact() and not _input_locked
 	_pass_button.disabled = not can_act or not _model.pass_available()
-	var selected := _model.selected_unit()
+	var selected: GameUnit = _model.selected_unit()
 	_build_bridge_button.disabled = (
 		not can_act
 		or selected == null
@@ -153,7 +174,7 @@ func _refresh_buttons() -> void:
 
 
 func _refresh_log() -> void:
-	var entries := _model.log_entries()
+	var entries: Array[String] = _model.log_entries()
 	if entries.is_empty():
 		_log_label.text = "No actions yet."
 		return
@@ -165,7 +186,7 @@ func _refresh_log() -> void:
 
 
 func _refresh_promotion() -> void:
-	var pending := _model.has_pending_promotion() and not _model.state.game_over
+	var pending: bool = _model.has_pending_promotion() and not _model.is_game_over()
 	_promotion_overlay.visible = pending
 	if pending and not _promotion_was_visible:
 		%PromoteQueenButton.grab_focus()
@@ -177,18 +198,18 @@ func _refresh_promotion() -> void:
 
 
 func _refresh_draw_controls() -> void:
-	var state := _model.state
-	var game_over := state.game_over
+	var game_over: bool = _model.is_game_over()
+	var draw_reason: String = _model.game_draw_reason()
 	_offer_draw_button.disabled = (
 		game_over or _input_locked or not _model.can_offer_draw()
 	)
-	var incoming := not game_over and not _input_locked and _model.incoming_draw_offer()
+	var incoming: bool = not game_over and not _input_locked and _model.incoming_draw_offer()
 	_accept_draw_button.visible = incoming
 	_decline_draw_button.visible = incoming
 	_accept_draw_button.disabled = not incoming
 	_decline_draw_button.disabled = not incoming
-	if game_over and not state.draw_reason.is_empty():
-		_draw_status_label.text = "Draw: %s." % _draw_reason_text(state.draw_reason)
+	if game_over and not draw_reason.is_empty():
+		_draw_status_label.text = "Draw: %s." % _draw_reason_text(draw_reason)
 	elif _model.draw_offered_by_local():
 		_draw_status_label.text = "Draw offered — waiting for the opponent."
 	elif _model.incoming_draw_offer():
@@ -198,19 +219,21 @@ func _refresh_draw_controls() -> void:
 
 
 func _refresh_game_over() -> void:
-	var state := _model.state
-	_game_over_overlay.visible = state.game_over
-	if not state.game_over:
+	var game_over: bool = _model.is_game_over()
+	var draw_reason: String = _model.game_draw_reason()
+	var winner: int = _model.game_winner()
+	_game_over_overlay.visible = game_over
+	if not game_over:
 		_game_over_was_visible = false
 		return
-	if not state.draw_reason.is_empty():
+	if not draw_reason.is_empty():
 		_game_over_title.text = "Draw"
-		_game_over_detail.text = _draw_detail_text(state.draw_reason)
-	elif state.winner != GameConfig.NO_PLAYER:
+		_game_over_detail.text = _draw_detail_text(draw_reason)
+	elif winner != GameConfig.NO_PLAYER:
 		_game_over_title.text = _model.winner_text()
 		_game_over_detail.text = (
 			"The enemy King was captured."
-			if state.winner == _model.local_player
+			if winner == _model.local_player
 			else "Your King was captured."
 		)
 	else:
@@ -282,6 +305,9 @@ func _on_rematch_pressed() -> void:
 
 
 func _on_setup_pressed() -> void:
+	if _online_mode:
+		setup_requested.emit()
+		return
 	_setup_confirm_dialog.popup_centered()
 
 

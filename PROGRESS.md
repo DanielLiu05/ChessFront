@@ -1,10 +1,10 @@
 # Chessfront — Development Progress
 
-- Last updated: 2026-11-16
+- Last updated: 2026-11-17
 - Specification: `game-design.md` — authoritative and read-only
 - Engine: Godot 4.7.2-stable, GDScript
-- Repository: git initialized on `main`, no commits yet
-- Current stage: Phase 8 complete (setup, lifecycle, fog-safe AI turns, demo/soak/screenshots and APK); the Android export mode-resource bug is fixed and the APK rebuilt. P7-05 remains blocked on on-device 120-ply/thermal evidence
+- Repository: git initialized on `main`; Phase 8 commit `7da3f49` exists, later web changes are uncommitted
+- Current stage: Phase 9 (online multiplayer) is complete. P9-01 through P9-08 are implemented and verified, including the online board/lifecycle, GitHub Pages workflow, runbook and two-browser acceptance. Save/load, replay and takeback are explicitly excluded. P7-05 remains Blocked on on-device 200-ply/thermal evidence; real mobile-browser performance remains U-22, live Pages/tunnel deployment evidence remains U-20/U-26.
 
 ## Status legend
 
@@ -58,6 +58,16 @@
 | C-37 | Implement and verify Phase 8 batch 2 | Done | P8-03/P8-04 complete: rematch/return-to-setup lifecycle, You/AI HUD labels, game-over/menu buttons, in-match map selector removed; `PlayerView` knowledge fields, `AiObservation` boundary, deterministic one-ply `BasicAi`/`AiBrain` with captures, mines, exploration, recruitment, bridges, pass and draw decline; 2725 assertions/0 failures, compile 147 scripts/0 broken, all UI/mobile/setup/demos green, proxy soak 59.6 FPS avg/60 1% low/~322 draw calls, Android APK rebuilt/signed/verified |
 | C-38 | Implement and verify Phase 8 batch 3 | Done | P8-05/P8-06 complete: automatic AI turns with delay/input lock/generation cancellation, AI-first, witnessed-only fog-safe animation/logging, draw decline; Phase 8 demo, AI turn check, deterministic AI-vs-AI 120-ply soak on all shipped maps/both first players, and Phase 8 screenshots; 2725 assertions/0 failures, compile 151 scripts/0 broken, all UI/mobile/setup/AI/demo checks green, proxy soak 59.7 FPS avg/60 1% low/~321 draw calls, Android APK rebuilt/signed/verified. On-device thermal/120-ply remains P7-05 |
 | C-39 | Fix Android "no enabled match modes" export bug | Done | Phone build lacked the unreferenced mode `.tres`; added static `preload` of shipped modes, directory-scan merging and export include filters. Rebuilt APK now contains `vs_ai` exported resource/remap; 2728 assertions/0 failures, setup flow 0 failures. P7-05 device evidence still pending |
+| C-40 | Set up Web export foundation | Done | Added the single-threaded Web preset (`preset.3`), verified 4.7.2 web templates, exported `builds/web/index.html` release, served it locally and smoke-tested in Edge: setup renders, the desktop match starts and the 3D board renders with no console errors. Device-based mobile layout, custom shell, portrait prompt and hosting docs remain Phase 8W work |
+| C-41 | Implement and verify Phase 8W batch 1 (W-02/W-03) | Done | Added `web/shell.html` with full-viewport canvas, safe-area JS bridge, viewport/no-zoom contract and preset wiring; added `WebSafeArea`, `WebViewport`, `PlatformMode`, CSS-pixel/DPR metrics and device-based HUD selection. Browser checks: Windows UA 1280×720 desktop HUD, Pixel 7/iPhone 13 mobile HUD, narrow PC desktop HUD (by design), safe-area override, no console errors. 2781 assertions/0 failures, compile 158 scripts/0 broken, web layout check/native checks 0 failures, Web release and Android APK rebuilt |
+| C-42 | Implement and verify Phase 8W W-04 (portrait/fullscreen/rotate) | Done | Added the mobile-web tap-to-play gate with best-effort fullscreen/orientation lock, blocking rotate overlay, and orientation/visibility pause that cancels and resumes AI with no state mutation. Browser checks confirm overlays on desktop/mobile portrait/mobile landscape and fullscreen after tap; mobile match still starts. Web orientation check and native regression pass; 2794 assertions/0 failures, compile 160 scripts/0 broken, Android APK rebuilt. W-05 rendering/performance acceptance remains |
+| C-43 | Implement and verify Phase 8W W-05 (rendering/quality/performance) | Done | Verified Compatibility rendering and desktop/mobile HUDs in browser; measured 39.5 MB uncompressed wasm transfer, cold readiness 6.7–8.6s, warm ~2.4s. Added the mobile-browser DPR cap (2x), raising mobile-emulation average from 37.3 to 58.7 FPS (1% low 32.9, max 41.6ms); desktop headless measured 102.2 FPS avg. 2796 assertions/0 failures, compile 160 scripts/0 broken; Web release and native checks pass |
+| C-44 | Implement and verify Phase 8W W-06 (hosting + browser acceptance) | Done | Added `web/README.md` with export/serve/MIME/compression/caching/static-host guidance (gzip 10.1 MB, Brotli 6.9 MB) and `web/acceptance_test.js`. Acceptance: 0 failures across desktop 1280×720/1920×1080, narrow PC 600×900, Pixel 7 and iPhone 13; desktop HUD, mobile HUD, AI turn, play/rotate overlays, DPR cap and no console errors verified; screenshots inspected. 2796 assertions/0 failures, compile 160 scripts/0 broken |
+| C-45 | Plan Phase 9 (online multiplayer) | Done | Eight ordered tasks in four batches; decisions A-123 through A-134; user decisions random sides/first, 90s reconnect, hidden enemy gold, no save/load/replay/takeback, balance tuning and local-PC server recorded. No Phase 9 code written and `game-design.md` unchanged |
+| C-46 | Implement and verify Phase 9 batch 1 (P9-01/P9-02) | Done | Starting gold 2, 6-ply mine cycles and 200-ply limit applied; tests/demos recalibrated; 200-ply AI soak recorded; versioned protocol, action/view codecs and room state added with leak/validation tests. 2987 assertions/0 failures; compile 169 scripts/0 broken; all demos and UI/mobile/AI checks green; Android APK and Web release rebuilt |
+| C-47 | Implement and verify Phase 9 batch 2 (P9-03/P9-04) | Done | Authoritative `OnlineServer` + WebSocket host/CLI: room create/join, owner map selection, seeded random sides/first, authoritative action validation, per-player filtered views/events, limits/throttling; draw, heartbeat, 90-second reconnect grace with token resume/replacement, rematch/leave/cleanup. 3122 assertions/0 failures; compile 176 scripts/0 broken; two-client WebSocket check and CLI boot 0 failures; all demos/UI/mobile/setup/AI checks green; AI and 200-ply proxy soaks green; Web release and Android APK rebuilt/signed/verified |
+| C-48 | Implement and verify Phase 9 batch 3 (P9-05/P9-06) | Done | `OnlineClient` with WebSocket/fake transports, URL normalization, heartbeat, token storage/resume and reconnect backoff; `ClientMatchState`/`OnlineMatchSession` filtered-state and action-intent gateway (no `GameState`, no local resolution); HUD reads moved to model accessors; enabled `online_pvp` mode and `OnlineSetupPanel` for server URL, create/join, room code, owner map/start, assignment notice, leave/back, safe-area/44dp layout. 3223 assertions/0 failures; compile 190 scripts/0 broken; real two-client client check and all server/online UI checks green; demos/UI/mobile/setup/AI and soaks green; Web PCK contains `online_pvp.tres`; Android APK rebuilt/signed/verified |
+| C-49 | Implement and verify Phase 9 batch 4 (P9-07/P9-08) | Done | Online board/lifecycle: server view-only `OnlineMatchModel`, board/HUD actions through `OnlineMatchSession`, keyed action-id retry safety, entitled event logs/animations, own-gold-only HUDs, Another Match/Leave Room, disconnect/reconnect overlays with grace countdown, no AI loop. Deployment: GitHub Pages workflow, `.nojekyll`, online runbook, query-gated web test bridge and two-browser Playwright acceptance (desktop + mobile, reload/reconnect, expiry abort, another/leave, screenshots, no console errors). Export filters exclude builds/dependencies (PCK 498 KB, APK 28 MB). 3278 assertions/0 failures; compile 195 scripts/0 broken; all online/server/UI/demo/soak checks green |
 
 Notes:
 
@@ -84,6 +94,7 @@ Notes:
 - Phase 8 is complete: setup is the entry point; rematch/return-to-setup and You/AI labels are implemented; the AI now takes automatic turns with input locking, cancellation and fog-safe witnessed reporting. AI-vs-AI soaks complete all six map/first-player cases deterministically at the 120-ply limit. `game-design.md` remains unchanged; P7-05 device thermal evidence is still open.
 - Godot's global Android SDK path had reverted to the incomplete default before the final export; it was restored to `D:/SDk` under the earlier authorization, and the APK export/signature verification now passes.
 - The Android build initially showed "No enabled match modes are available." because the directory-scanned mode `.tres` was not packed. Shipped modes are now statically preloaded and included in export filters; the rebuilt APK contains `vs_ai` (A-113/C-39).
+- A single-threaded Web export preset is configured. Phase 8W batch 1 is implemented: the custom shell provides a full-viewport canvas and safe-area bridge, `PlatformMode` selects the mobile HUD only on mobile browsers, and web metrics use CSS pixels × devicePixelRatio. Desktop, Android and iOS emulated browser checks pass; portrait/fullscreen behavior and hosting docs remain W-04–W-06.
 - P6-01 through P6-06 are complete: presentation model, Main scene, 3D board/terrain/pieces, fog, highlights, HUD actions, promotion, animations, draw UI, game-over overlay, map selector/help, Phase 6 demo, and screenshot harness exist.
 - `PresentationModel` is headless, uses `PlayerView` for highlights and known units, and routes actions through `ActionResolver`/`DrawSystem`.
 - The Main board renders `PlayerView` terrain, pieces and fog; unexplored tiles use opaque fog, explored tiles use a dim overlay.
@@ -284,7 +295,7 @@ Phase 1 has **nine tasks**. Recommended progression:
 | 3 | P1-06, P1-07 | Movement rules; largest test surface, split by unit family. |
 | 4 | P1-08, P1-09 | Turn/action pipeline and final verification harness. |
 
-**Phase 1–6 and the engine draw rules are complete.** Phase 6 is recorded in Section 15; Phase 7 is implemented and phone-smoke-tested in Section 16. P7-05 remains Blocked on on-device thermal/120-ply evidence; the AI opponent now exists. Phase 8 is complete in Section 17. Next: run the P7-05 device soak (install the new APK), then plan Phase 9. Draw UI is complete; network wiring remains deferred.
+**Phase 1–6 and the engine draw rules are complete.** Phase 6 is recorded in Section 15; Phase 7 is implemented and phone-smoke-tested in Section 16. Phase 8 is complete in Section 17 and Phase 8W in Section 18. Phase 9 is complete: batch 1 (P9-01/P9-02) in Section 19.8, batch 2 (P9-03/P9-04) in Section 19.9, batch 3 (P9-05/P9-06) in Section 19.10 and batch 4 (P9-07/P9-08) in Section 19.11. Two browser clients can now play a complete online match through the authoritative server, including draw, another match, leave, reload/reconnect and expiry, with the Pages workflow and online runbook in place. P7-05 remains Blocked on on-device thermal evidence; its soak target is 200 plies. Save/load, replay and takeback are deferred; live Pages/tunnel deployment evidence remains U-20/U-26.
 
 ## 4. Phase 1 acceptance trace
 
@@ -996,29 +1007,184 @@ Every ambiguity or conflict found while reading the specification is recorded he
 - **Why:** An exported PCK does not reliably discover unreferenced resources by directory scan. A static reference guarantees the shipped mode exists on device while keeping future modes data-driven.
 - **Status:** Resolved 2026-11-16; APK rebuilt.
 
+### Web build (Phase 8W, before Phase 9)
+
+#### A-114 — Web hosting and threading baseline
+- **Issue:** The web target can be single-threaded on any static host, or threaded with stricter response headers.
+- **Resolution:** Ship a single-threaded WebAssembly build by default (`variant/thread_support=false`). It must run from a plain static server without COOP/COEP headers. No PWA/offline mode is added. Threaded builds remain a future option only if a host with cross-origin isolation is chosen.
+- **Why:** The user selected a static host; single-threaded deployment has the fewest hosting constraints and no SharedArrayBuffer failure mode.
+- **Status:** Resolved; Web preset added and release export smoke-tested.
+
+#### A-115 — Device-based web layout selection
+- **Issue:** A narrow PC browser window must not be mistaken for a mobile browser, and mobile web should match the Android presentation.
+- **Resolution:** Select the mobile HUD/touch/camera/quality path on native mobile and on mobile browsers identified by `web_android`, `web_ios` (including the iPadOS Macintosh-plus-touch case). All other web clients use the desktop HUD, mouse/keyboard camera and desktop quality regardless of window width. Add a testable platform-mode helper with injected feature/touch values.
+- **Why:** Matches the user's "mobile browser looks like Android, PC browser looks like Windows" requirement and avoids surprising layout changes when resizing a desktop window.
+- **Status:** Implemented and verified in W-03.
+
+#### A-116 — Mobile web portrait behavior
+- **Issue:** Browsers cannot reliably force portrait orientation or fullscreen.
+- **Resolution:** Mobile web always renders the portrait mobile layout. On the first user interaction, attempt fullscreen and `screen.orientation.lock("portrait")` through JavaScriptBridge where supported. If the device remains in landscape, show a blocking rotate-to-portrait overlay and pause game input until portrait returns. PC web never shows the prompt or requests fullscreen automatically.
+- **Why:** Best-effort matches the Android portrait experience while remaining honest about browser limitations and avoiding unusable landscape input.
+- **Status:** Implemented in W-04; browser-dependent best-effort with the rotate overlay as fallback.
+
+#### A-117 — Web renderer and visual profile
+- **Issue:** Web export uses the Compatibility renderer; PC web cannot match Forward+ exactly.
+- **Resolution:** Accept Compatibility as the web renderer. PC web uses the desktop HUD/camera and desktop-quality presentation where Compatibility supports it; mobile web uses the existing mobile quality profile (decorations/shadows off, reduced 3D scale). Verify board/piece/fog readability rather than pixel parity with Forward+.
+- **Why:** Compatibility is the supported browser renderer; this preserves the Windows-like layout and Android-like mobile presentation without promising unavailable rendering features.
+- **Status:** Verified in W-05: desktop and mobile HUDs/board render in Compatibility, with the mobile DPR cap (A-122) for performance.
+
+#### A-118 — CSS-pixel metrics on web
+- **Issue:** `DisplayServer.screen_get_dpi()` reports a browser DPI (typically 96), shrinking the setup panel and 44dp controls compared with native desktop/Android.
+- **Resolution:** On web, treat one dp as one CSS pixel (reference DPI 160) for `MobileMetrics`, setup sizing and touch-target minimums; keep native platform DPI behavior unchanged. Desktop web setup panels target the normal 520px-class width; mobile web controls remain at least 44 CSS px.
+- **Why:** CSS pixels are the browser's layout unit and the correct basis for readable panels and touch targets across high-DPI phones and desktop monitors.
+- **Status:** Implemented and verified in W-03 (with the mobile DPR cap in A-122).
+
+#### A-119 — Custom web shell, canvas and safe areas
+- **Issue:** The default Godot shell lacks browser-safe-area mapping and a portrait prompt, and mobile browser chrome can overlap the canvas.
+- **Resolution:** Add a custom HTML shell that preserves Godot's placeholders, fills the viewport with the canvas, disables page scrolling/zoom gestures, uses `viewport-fit=cover`, maps `env(safe-area-inset-*)` into Godot's safe-area handling, and provides the portrait/rotate overlay on coarse-pointer devices. Keep the shell generic for static hosting; no server-side code.
+- **Why:** The game's safe-area and touch contract must survive browser chrome/notches, and the shell is the correct layer for viewport/orientation concerns.
+- **Status:** Implemented in W-02; portrait/rotate overlays added in W-04.
+
+#### A-120 — Web build artifacts and hosting delivery
+- **Issue:** The project already ignores `builds/`; the web target needs a reproducible output and hosting instructions without committing binaries.
+- **Resolution:** Keep the Web preset committed with `builds/web/index.html` as the release output. Add a documented release command and static-host notes (WASM MIME type, optional Brotli/gzip, no COOP/COEP requirement). Do not commit generated web files or add a deployment target unless separately requested.
+- **Why:** Keeps the repository source-only and makes local/static deployment reproducible.
+- **Status:** Implemented in W-06; `web/README.md` documents export/serve/MIME/compression/caching and the acceptance harness.
+
+#### A-121 — Native desktop and Android behavior preservation
+- **Issue:** Introducing web platform detection must not regress the verified desktop, Android or AI behavior.
+- **Resolution:** Centralize platform decisions in a testable helper and leave native desktop/mobile feature tests unchanged. `load_map` test paths, HUD contracts, AI turns and export presets keep their existing behavior. Web-specific metrics/shell behavior is gated on `OS.has_feature("web")`.
+- **Why:** Web is additive; the existing Windows and Android builds are already verified and must remain the baseline.
+- **Status:** Verified in Phase 8W batch 1; native UI/mobile/AI/setup checks and Android export remain green.
+
+#### A-122 — Mobile-browser device-pixel-ratio cap
+- **Issue:** At a mobile-emulated DPR of 2.625, the Web canvas rendered at 1081×2202 and averaged 37.3 FPS in the Edge proxy, while desktop 1280×720 averaged 102 FPS.
+- **Resolution:** On mobile browsers only, the custom shell caps `window.devicePixelRatio` at 2.0 before Godot starts. CSS layout and 44 CSS px controls are unchanged; the 3D and UI canvases render at no more than 2× CSS resolution. If a browser forbids redefining the property, the native DPR is retained. Desktop and native builds are unchanged.
+- **Why:** The cap reduced fill-rate cost by about 40% and raised the same mobile-emulation run to 58.7 FPS average (1% low 32.9, max 41.6ms) while keeping the portrait UI crisp at 2×. Real mobile-browser performance still requires device testing (U-22).
+- **Status:** Implemented and measured in W-05.
+
+**Phase 8W batch 1 implementation note:** A-115, A-118, A-119 and A-121 are implemented and verified in Section 18.7.
+**W-04 implementation note (2026-11-17):** A-116 is implemented and verified in Section 18.8.
+**W-05 implementation note (2026-11-17):** A-117 and A-122 are implemented and measured in Section 18.9.
+**W-06 implementation note (2026-11-17):** A-120 is implemented and verified in Section 18.10. Phase 8W is complete; real mobile-browser performance remains U-22.
+
+### Online multiplayer (Phase 9)
+
+#### A-123 — Phase 9 scope: online play only; persistence and takeback excluded
+- **Issue:** The design document's Phase 9 groups online multiplayer with save/load and replay. The user also asked about opponent-approved takeback.
+- **Resolution:** Implement only online human-vs-human play in Phase 9. Do not implement save/load, replay, or move retraction. The design's save/load/replay acceptance is deferred, and U-05 remains unresolved. The engine stays deterministic so a future replay phase can use the authoritative action history.
+- **Why:** Explicit user decision; keeps the networking phase focused and avoids designing persistence and fog-sensitive rollback prematurely.
+- **Status:** Planned; no code written.
+
+#### A-124 — Authoritative headless server topology
+- **Issue:** Fog of war requires each client to receive only its own view; browsers cannot accept incoming WebSocket connections, and a player-hosted browser would have full hidden state.
+- **Resolution:** Run one authoritative headless Godot process on this PC. It owns rooms, match state, action validation, random assignment, per-player views and reconnect timers. The GitHub Pages client is static only. For testing, `cloudflared` exposes the server through a quick tunnel. The server binds `127.0.0.1`; no browser-host/WebRTC/peer-authoritative path is added.
+- **Why:** Server authority satisfies U-06 and the design's validation requirement; it is also the simplest web-compatible architecture because browser clients cannot listen and ENet is unavailable on web.
+- **Status:** Implemented as P9-03/P9-05/P9-06/P9-07: headless server, localhost bind, CLI mode, per-player views, WebSocket/fake client transports, Play Online setup and the online board. The transport uses `TCPServer` + `WebSocketPeer` because this Godot build has no `WebSocketServer` class (A-135).
+
+#### A-125 — WebSocket JSON protocol and per-player view protocol
+- **Issue:** Godot's high-level ENet transport does not work in web exports, and sending a full `GameState` would leak hidden units, terrain and enemy gold.
+- **Resolution:** Use `WebSocketPeer` on clients and a WebSocket server on the headless server (implemented with `TCPServer` + `WebSocketPeer`; A-135) with a versioned JSON message protocol. Clients send action intents; the server validates and returns only that player's filtered view plus permitted public/local events. Do not use scene replication or `@rpc` node paths for match state. The view includes known units, explored/visible tiles, known mines/tokens, known bridges, own gold and public turn/game-over/draw state; it omits enemy gold, hidden units, unexplored state and hidden logs.
+- **Why:** The game is turn-based, the server is authoritative, and a small explicit protocol is easier to test and harder to leak through than full-state replication. It also keeps the server independent of the client scene tree.
+- **Status:** P9-02 codecs, P9-03 server transport/views/events, P9-05 client transport/filtered model and P9-07 online presentation implemented and verified.
+
+#### A-126 — Online room and match lifecycle
+- **Issue:** The user specified the online flow but not the details of ownership, rematch and leaving.
+- **Resolution:** Mode select → server URL → create room or join by code → lobby. The room owner selects the map before every match and starts it when both players are present. The server reports the room code, players, map and connection state. After game over, “Another Match” returns that player to the lobby; when both choose it, the owner re-selects the map and starts. “Leave” closes the room; the other player returns to setup with a message. Mid-match leave or reconnect expiry aborts the match with no winner (A-134). No hotseat or client-side map selection is added.
+- **Why:** Matches the requested flow, keeps map choice with the room creator and avoids a stranded opponent or an invented forfeit rule.
+- **Status:** Server room/lifecycle (P9-03/P9-04), setup/lobby UI (P9-06) and online match lifecycle UI (P9-07) implemented and verified, including map ownership, start gating, rematch votes, leave and assignment display.
+
+#### A-127 — Server-side random side and first-player assignment
+- **Issue:** The user chose random selection, while the design forbids randomness in the rules engine and A-100 made first player explicit.
+- **Resolution:** At each match start, the server randomly assigns the two players to Player 1/Player 2 and randomly chooses the first player independently, then records both in the match state. Re-roll on every match/rematch. Clients never roll. Use an injectable RNG for tests; once assigned, the match is deterministic and replayable.
+- **Why:** Satisfies the user's fairness choice without introducing rules randomness or client disagreement; recording the result keeps the match reproducible.
+- **Status:** Implemented as P9-03; seeded assignment, side opposition, recorded history and rematch re-roll are tested.
+
+#### A-128 — Reconnect window and session ownership
+- **Issue:** Web and mobile connections drop on backgrounding, refresh, sleep or network changes; without reconnection a full match is lost.
+- **Resolution:** Issue a private per-player token at join. On unexpected disconnect, pause the match and keep the room for 90 seconds (test override allowed); the connected player sees a waiting state. Reconnect with room code + token, replace any stale connection, and send a full current view plus pending request state. After the grace period, abort the match and room with no winner. Intentional leave is immediate and is not a reconnect. Reconnect does not survive a server or tunnel restart; no save/load exists.
+- **Why:** Covers refresh/background/network blips without turning a disconnect into a forfeit, while keeping the server in-memory and simple.
+- **Status:** Implemented as P9-04; heartbeat detection, 90-second production grace, token resume/replacement, pending-request resync and no-winner abort are tested.
+
+#### A-129 — Enemy gold is hidden
+- **Issue:** The current HUD shows both players' gold, but the user requires enemy gold to be invisible; the AI observation already excludes it.
+- **Resolution:** The server never sends enemy gold to an online client. The shared HUD shows own gold and an unavailable/unknown opponent value, in both online and vs-AI modes, including at game over. The opponent's mine income and gold-derived affordability remain hidden.
+- **Why:** Makes the information rule consistent with fog of war and with the existing AI boundary; avoids an online leak path that the AI already avoids.
+- **Status:** Implemented in P9-02/P9-07: the wire view excludes enemy gold, both HUDs show only own gold plus `Opponent ?` during the match and at game over, and affordability/income use the local view.
+
+#### A-130 — Balance tuning: 2 starting gold, 6-ply mine cycles, 200-ply limit
+- **Issue:** Post-Phase-8 AI playtesting prompted economy and match-length changes; the design document records different initial values.
+- **Resolution:** Each player starts with 2 gold. A mine production cycle is 6 completed plies (3 rounds at 2 plies per round), not 4. The default turn limit is 200 plies (100 turns per player), not 120. Centralize these values in configuration, update HUD labels and tests/demos, and re-run the deterministic AI soak on all shipped maps and both first-player choices. `game-design.md` remains unchanged; this is recorded as tuning, and P7-05's soak target becomes 200 plies.
+- **Why:** Explicit user balance decision after AI testing. The longer limit and slower cycle partly offset over a full match, so the re-baseline matters more than the constants alone.
+- **Status:** Implemented as P9-01 and verified in Section 19.8.
+
+#### A-131 — Online client state boundary and action gateway
+- **Issue:** `PresentationModel` currently owns a full `GameState` and calls `ActionResolver` locally; the HUD also reads `GameState` directly. Reusing that as-is in online mode would make clients authoritative and risk hidden-state access.
+- **Resolution:** Add a match-session/action-gateway boundary. Local sessions keep the current `ActionResolver` path; online sessions send typed action intents and apply only server responses. The online client keeps a filtered view/public state for rendering and highlights, never a full authoritative state, and never resolves online actions locally. HUD reads go through model accessors where needed. The AI path and existing local tests remain unchanged.
+- **Why:** The validation and fog guarantees only hold if the server is the sole authority; separating submission from presentation also makes the online client testable with a fake transport.
+- **Status:** Implemented in P9-02/P9-05/P9-07: codecs, client session gateway, HUD accessors and online board/input routing all use the filtered view and never resolve actions locally.
+
+#### A-132 — GitHub Pages client and local server hosting
+- **Issue:** GitHub Pages can host only static files, not the WebSocket server; the user wants Pages hosting and a server on this PC.
+- **Resolution:** Publish the single-threaded Web client to GitHub Pages (generated artifact, not committed to `main`; `.nojekyll`; relative asset paths). Run the Godot headless server and `cloudflared` on this PC; both players use the resulting `wss://` URL. Quick tunnels are testing-only (random URL, public, no SLA, no persistence). A permanent server host/domain remains U-20.
+- **Why:** Separates static client delivery from authoritative hosting, keeps Pages usable, and is honest about the quick tunnel's limits.
+- **Status:** P9-08 added `.github/workflows/pages.yml`, `.nojekyll` in the artifact, relative-path/subpath acceptance and `web/ONLINE_RUNBOOK.md`; a live Pages deployment and permanent host/domain remain U-20.
+
+#### A-133 — Phase 9 verification boundary
+- **Issue:** Unit tests alone cannot prove authoritative networking, hidden-information isolation or browser behavior.
+- **Resolution:** Require protocol/view/action unit tests, a headless server plus two WebSocket-client integration test, payload leak tests (enemy gold, hidden units/terrain, hidden events), mocked online setup layout/flow checks, two-browser acceptance (desktop and mobile-emulated) against the local server, and the existing native/AI/Android regression. Quick-tunnel and physical-phone smoke are manual evidence if available. Do not claim native-device thermal acceptance; P7-05 remains Blocked.
+- **Why:** Networking failures are integration failures; the acceptance evidence must cover both ends and the wire, not just one client's view.
+- **Status:** P9-02/P9-03 provide protocol/view/action unit tests and two-client WebSocket integration tests; P9-05/P9-06 add client/session and mocked lobby checks; P9-08 adds the two-browser Playwright acceptance with desktop/mobile, hidden-info, reload/reconnect and expiry coverage.
+
+#### A-134 — Leave/disconnect result semantics
+- **Issue:** The user specified a reconnect window but not what happens after it expires or when a player intentionally leaves a live match.
+- **Resolution:** An intentional mid-match leave or an expired reconnect closes the room and aborts the match with no winner; the remaining player receives a clear message and returns to setup/lobby. No forfeit, rating or automatic win is introduced.
+- **Why:** Avoids awarding a result without an opponent’s consent and keeps the first online version simple; revisit if competitive play needs forfeits.
+- **Status:** Implemented in P9-04/P9-07; leave and grace expiry close the room with no winner, and the client returns to online setup with a clear notice.
+
+#### A-135 — WebSocket server transport implementation
+- **Issue:** Godot 4.7.2 does not expose the `WebSocketServer` class named in the plan; only `WebSocketPeer` and `WebSocketMultiplayerPeer` are registered.
+- **Resolution:** The headless host listens with `TCPServer` and creates one `WebSocketPeer` per accepted stream via `accept_stream`; outbound messages are buffered until the peer reports OPEN. The wire contract stays plain WebSocket JSON with `NetProtocol`, identical for the future `WebSocketPeer` browser client. Per-connection control stays with `OnlineServer` for tokens, heartbeats and replacement.
+- **Why:** Keeps the browser-compatible `ws://`/`wss://` contract without adopting multiplayer-peer scene replication or signals, and avoids depending on a class missing from this engine build.
+- **Status:** Implemented as P9-03 and verified by the two-client WebSocket integration check.
+
+#### A-136 — Query-gated Web online acceptance bridge
+- **Issue:** Driving the Godot canvas UI by coordinates/keyboard with Playwright is brittle, especially for room codes and reconnect flows.
+- **Resolution:** Web builds expose `window.chessfrontOnlineCommand(cmd, arg)` only when the URL includes `online_test=1`. It is backed by a retained `JavaScriptBridge.create_callback` handler and a `window.chessfrontOnlineResult` slot; commands drive the same client/session/controller methods (open online, connect, create/join, map/start, move/recruit/pass/draw/rematch/leave) and return a state summary. Tokens and full state are never exposed; normal Pages URLs do not install the bridge. The headless server also accepts `--grace-seconds` for acceptance timing.
+- **Why:** Reliable two-browser acceptance without adding a server test mode or making the online UI depend on test-only hooks.
+- **Status:** Implemented as P9-08; used by `web/online_acceptance_test.js`.
+
 ## 6. Unresolved and deferred problems
 
 | ID | Problem | Current handling | Target |
 | --- | --- | --- | --- |
-| U-01 | Draw rules (turn limit, threefold repetition, agreed draw) are MVP requirements but have no assigned phase | Engine rules and draw-offer UI are complete; network flow remains | Network phases |
-| U-02 | First-move advantage | Phase 8 makes the first player an explicit setup choice (A-100), so the advantage can be playtested; no compensation or swap rule is defined | Playtesting after Phase 8 |
+| U-01 | Draw rules (turn limit, threefold repetition, agreed draw) are MVP requirements but have no assigned phase | Engine rules and draw-offer UI are complete; Phase 9 adds the online request/response flow (P9-04/P9-07); persistence remains deferred | Phase 9 online |
+| U-02 | First-move advantage | Phase 8 makes the first player an explicit setup choice (A-100); Phase 9 randomizes it per match (A-127). No compensation or swap rule is defined, so the advantage still needs playtesting | Playtesting after P9-01 |
 | U-03 | Full map validation | Resolved in P5-01/P5-03; the three shipped maps pass full validation | Done |
 | U-04 | Map Editor exclusion from game exports | Feature-tag entry and preset filters are in place; the Android game APK now builds with editor/tests excluded, but the Map Editor tool binary and runtime contents have not been export-verified | Tool export when needed (U-14) |
 | U-14 | Real game and tool export verification | Android debug APK builds, signs, verifies, installs and launches on a physical phone (C-34); portrait/touch smoke passed. The Map Editor tool export and desktop/other platform binaries remain unverified | Tool export when needed |
-| U-05 | Save/load and replay format | Not designed; Phase 1 only keeps deterministic state and canonical map serialization | Phase 9 |
-| U-06 | AI and network information isolation | The AI boundary is implemented and tested in P8-04: `AiObservation`/`PlayerView` only, with hidden-state invariance and enemy-gold absence tests (A-106). Network isolation remains for Phase 9 | Phase 9 (network) |
+| U-05 | Save/load and replay format | Not designed. The user explicitly excluded save/load and replay from Phase 9 (A-123); the deterministic engine and authoritative action history remain the future foundation | Deferred by user decision |
+| U-06 | AI and network information isolation | The AI boundary is implemented and tested in P8-04. P9-02 adds the per-player view codec with enemy-gold/hidden-unit exclusion tests; P9-03 sends only filtered views/events and the two-client wire check verifies hidden units and no gold/token leakage; P9-05 confirms the client model never retains a `GameState` or enemy gold; P9-08's two-browser check verifies hidden gold/units and no console errors. Real tunnel behavior remains U-26 | Done for Phase 9 |
 | U-07 | Promotion selection UX | Resolved in P6-01/P6-04; the HUD modal pauses, resolves or cancels without consuming a turn | Done |
 | U-08 | Non-standard board masks | Map v1 requires centered contiguous rows (A-29); per-column final playable row and editor support are deferred | After MVP |
 | U-09 | Phase 1 blockers | None. All Phase 1 ambiguities have a recorded resolution | — |
 | U-10 | Phase 2 blockers | None. Phase 2 is complete; all decisions are recorded | — |
 | U-11 | Phase 3 blockers | None. Phase 3 is complete; all decisions are recorded | — |
 | U-12 | Phase 4 blockers | None. Phase 4 is complete; draw rules are now implemented | — |
-| U-13 | Draw offer UI/network and repetition persistence | Engine API, auto-draw rules and draw-offer UI are complete; network flow and persistence remain | Phase 9 persistence |
-| U-15 | Complete local match loop | Resolved in P8-05/P8-06: AI turns, AI-first, fog-safe presentation and draw decline work, and deterministic AI-vs-AI 120-ply matches complete on all shipped maps/both first players | Done |
-| U-16 | Android thermal and 120-ply verification | The game now supports a complete AI match and the APK is rebuilt/signed/verified, but the device model/Android version, full 120-ply frame-time log, thermal sampling and on-device soak evidence are still missing | P7-05 device run |
+| U-13 | Draw offer UI/network and repetition persistence | Engine API, auto-draw rules and draw-offer UI are complete. P9-04 adds the authoritative online offer/accept/decline flow (pending state, no turn consumed, no winner on decline) and P9-07 wires the online HUD and game-over flow; persistence remains deferred | Done for Phase 9 |
+| U-15 | Complete local match loop | Resolved in P8-05/P8-06: AI turns, AI-first, fog-safe presentation and draw decline work; deterministic AI-vs-AI matches completed on all shipped maps and both first players. The evidence used the pre-balance 120-ply limit; P9-01 re-baselines it to 200 | Done (historical) |
+| U-16 | Android thermal and 200-ply verification | The game supports a complete AI match and the APK is rebuilt/signed/verified, but the device model/Android version, full frame-time log, thermal sampling and on-device soak evidence are still missing. P9-01 changes the target from 120 to 200 plies | P7-05 device run |
 | U-17 | iOS mobile build and device testing | Phase 7 verifies Android only; portrait/orientation settings are shared where applicable, but no iOS export or device test is planned | After Android MVP; later mobile phase |
 | U-18 | Mobile landscape and orientation changes | Portrait-only MVP by user decision; desktop remains resizable and unchanged; landscape mobile layouts are deferred | After MVP/playtesting |
-| U-19 | AI strength and playtest tuning | The basic deterministic one-ply AI is implemented and integrated; no difficulty levels, deeper search or balance tuning are included. AI-vs-AI 120-ply matches currently end by turn-limit draws, so playtesting should judge aggression and King-hunting quality | After Phase 8 playtesting |
+| U-19 | AI strength and playtest tuning | With the P9-01 balance values, the 200-ply soak now ends by King capture on borderlands (P1 wins at 91 plies when first; at 108 when second) and by turn-limit draw on highland_woods/river_crossing for both first players. No fallbacks; manual playtesting and AI aggression review remain | After P9-01 / playtesting |
+| U-20 | Hosting URL and deployment | P9-08 adds the GitHub Pages workflow, `.nojekyll` and a local `/repo/` subpath acceptance; no live Pages deployment was performed (no push/credentials) and no permanent server host/domain exists | After Phase 9 if publishing |
+| U-21 | Mobile web orientation lock | Implemented best-effort fullscreen/orientation lock plus a blocking rotate overlay. Browser behavior still varies by device; the overlay is the guaranteed fallback | Revisit after real-device testing |
+| U-22 | Real mobile-browser performance | Web FPS was measured in Playwright mobile emulation on a desktop GPU, not on a physical phone browser. The mobile DPR cap improves the proxy result; W-06 acceptance is complete in emulation, but real device/browser performance is unverified | Before publishing / device testing |
+| U-23 | Browser game-over/rematch and multi-touch automation | The committed browser harness covers layouts, overlays, AI turn and console errors; game-over/rematch and pinch/long-press remain covered by native UI/mobile tests. P9-08 adds two-browser online flows and reconnect; pinch/long-press remain native-tested | Done for Phase 9 |
+| U-24 | Online server availability and restart persistence | The server is a headless process on this PC behind a quick tunnel. Sleep, network loss, server/tunnel restart or a changed tunnel URL ends rooms; reconnect only covers client drops and no save/load exists | After Phase 9 / production hosting |
+| U-25 | Public tunnel abuse and room security | The quick tunnel is public. P9-02/P9-03 implement room codes, private player tokens, room/client/message limits, a 40-message-per-second connection throttle and owner-only map/start checks; no accounts, moderation or production DDoS plan exists | After Phase 9 / production hosting |
+| U-26 | Public tunnel connectability and browser quirks | The runbook covers URL changes, idle sockets and backgrounding; P9-08 verifies local two-browser reload/reconnect and expiry, but no real Cloudflare tunnel, WSS handshake or phone-browser session was run | When publishing / device testing |
+| U-27 | Balance outcome review | P9-01 recorded the 200-ply AI soak: two borderlands runs end by King capture, four map/first-player cases end in turn-limit draws. Starting gold/mine cadence/limit remain tuning values; manual playtesting and recruitment-timing review remain necessary | After P9-01 / playtesting |
 
 ## 7. Confirmed exclusions
 
@@ -1026,11 +1192,16 @@ These are explicit specification decisions, not open questions:
 
 - No castling and no en passant initially (Section 3.2); revisit only if playtesting shows a need.
 - No shared-screen or hotseat play in any version.
-- No randomness and no runtime map generation; maps come only from authored files.
+- No rules randomness and no runtime map generation; maps come only from authored files. Phase 9's server-side random side/first assignment (A-127) is lobby assignment, recorded before the match, not rules randomness.
 - No check or checkmate rules; the King is captured like any other piece.
 - The Map Editor is a separate tool and never part of game builds.
 - No technology tree, unit upgrades, hit points, or random combat outcomes.
-- No online multiplayer, sophisticated AI, or extra unit types in the MVP.
+- No online multiplayer, sophisticated AI, or extra unit types in the MVP. Online human-vs-human play is added after the MVP in Phase 9 (A-123/A-124).
+- No save/load, replay, or move takeback in Phase 9 (A-123); these remain deferred.
+- No account system, matchmaking, chat, spectators, rankings, or public lobby browser in Phase 9.
+- No browser-hosted/peer-authoritative server, no full-state broadcast, and no client-side authoritative action resolution (A-124/A-125/A-131).
+- No production server host or domain in Phase 9; the client is on GitHub Pages, the server is on this PC, and the quick tunnel is testing-only (A-132).
+- No random map selection; the room owner selects the map before every match. Only sides and first player are randomized (A-126/A-127).
 
 ## 8. Working agreements
 
@@ -2779,3 +2950,768 @@ git status --short
   - All export presets include `resources/match_modes/*.tres`.
   - Added a built-in-mode assertion to the mode-registry tests.
 - Verification: 2728 assertions/0 failures; setup flow 0 failures; APK rebuilt and inspected to contain the exported `vs_ai` resource and remap. No on-device thermal evidence yet (U-16).
+
+## 18. Phase 8W — Web build (complete 2026-11-17, before Phase 9)
+
+Add a browser target before Phase 9. A mobile browser must use the Android-style portrait touch presentation; a PC browser must use the Windows-style desktop HUD, mouse/camera controls and resizable layout. The target is a single-threaded, static-hostable WebAssembly build. No online multiplayer, save/load, rules, AI or map/editor changes are included.
+
+The export foundation already exists: a Web preset is configured, 4.7.2 web templates are installed, and a release build served locally in Edge renders setup and a desktop-HUD match with no console errors (C-40).
+
+### 18.1 Task breakdown
+
+| ID | Task | Depends on | Status |
+| --- | --- | --- | --- |
+| W-01 | Web export preset, templates and release smoke baseline | Phase 8 complete | Done |
+| W-02 | Custom web shell, full-window canvas and safe-area bridge | W-01 | Done |
+| W-03 | Web platform detection, HUD selection and CSS-pixel metrics | W-01 | Done |
+| W-04 | Mobile web portrait behavior, fullscreen and rotate prompt | W-02, W-03 | Done |
+| W-05 | Web rendering/quality, loading and performance checks | W-02, W-03 | Done |
+| W-06 | Static hosting docs, browser acceptance suite and screenshots | W-02 through W-05 | Done |
+
+#### W-01 — Web export preset, templates and release smoke baseline
+
+Scope:
+
+- Add a `Web` export preset with:
+  - `platform="Web"`, `export_filter="all_resources"`, include filters for maps and mode resources, editor/tests excluded.
+  - `variant/thread_support=false`, adaptive canvas resize, PWA disabled, output at `builds/web/index.html`.
+- Confirm the installed 4.7.2 templates include web debug/release files.
+- Export a release build, serve `builds/web/` over HTTP, and smoke-test in a desktop browser: setup renders, Start Match loads, the 3D board renders, no console errors.
+- Record the release command and note that `builds/` remains git-ignored.
+
+Acceptance:
+
+- A Web release export succeeds from the command line.
+- The served build renders setup and a playable match in a desktop browser with no script/console errors.
+- The Web preset is committed; generated files are not.
+
+#### W-02 — Custom web shell, full-window canvas and safe-area bridge
+
+Scope:
+
+- Add a self-contained custom HTML shell based on the Godot 4.7 template, preserving all `$GODOT_*` placeholders and wiring it through `html/custom_html_shell`.
+- Shell behavior:
+  - Viewport meta with `width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover`.
+  - Full-viewport canvas (`100%`/`100dvh`), no page scroll, overscroll or browser zoom gestures; canvas focus on start.
+  - Mobile/safe-area CSS using `env(safe-area-inset-*)`; expose the applied insets to Godot via a small JavaScriptBridge/JS helper, with a zero-inset fallback and a test override.
+  - Readable loading/failure messages and no external network dependencies.
+- Ensure the canvas resize policy reports the real browser viewport; keep the existing anchor/container UI rather than adding a global stretch that would change native desktop behavior.
+- Add a headless/unit test for the safe-area fallback/conversion and inspect desktop + portrait browser screenshots.
+
+Acceptance:
+
+- PC and mobile browser canvases fill the viewport without scrollbars or letterboxing unless intentionally configured.
+- No interactive UI is hidden under a simulated safe-area inset.
+- The shell remains compatible with Godot's exported placeholders and works on a plain static host.
+
+#### W-03 — Web platform detection, HUD selection and CSS-pixel metrics
+
+Scope:
+
+- Add a small testable platform-mode helper that answers "use mobile UI?" from injected feature/touch values:
+  - Native mobile/Android/iOS → mobile UI (unchanged).
+  - Web with `web_android` or `web_ios`, including the iPadOS Macintosh-with-touch case → mobile UI.
+  - All other web clients (Windows/macOS/Linux PC browsers) → desktop UI even if the window is narrow.
+  - Native desktop → desktop UI.
+- Replace the direct `OS.has_feature("mobile")` selection in `MatchController` with this helper; keep a test-only override.
+- On web, map 1dp to 1 CSS pixel for `MobileMetrics` (reference DPI 160): setup panel sizing, 44 CSS px touch targets and the mobile HUD must not shrink due to the browser's reported DPI.
+- Preserve desktop/mobile HUD, camera, mouse/touch and quality selection for the corresponding modes.
+- Add tests for feature combinations, iPadOS detection, metric conversion and setup/HUD layout at desktop and phone browser sizes.
+
+Acceptance:
+
+- A PC browser always gets the desktop HUD/camera/mouse layout, including a narrow window.
+- An Android/iOS browser gets the mobile portrait HUD, touch gestures and mobile quality.
+- Web setup panels are desktop-sized on PC and touch-sized on mobile; all controls remain at least 44 CSS px.
+- Native desktop and Android behavior is unchanged.
+
+#### W-04 — Mobile web portrait behavior, fullscreen and rotate prompt
+
+Scope:
+
+- Add a first-interaction "tap to play" path on mobile web that requests fullscreen and attempts `screen.orientation.lock("portrait")` through JavaScriptBridge where supported.
+- If the browser remains landscape:
+  - Show a blocking rotate-to-portrait overlay (shell and/or in-game) that dims the game and pauses match input/AI.
+  - Resume normally when portrait returns; do not mutate game state or consume turns while blocked.
+- PC web never requests fullscreen or shows the rotate prompt.
+- Handle tab visibility changes: pause input/gestures and resume cleanly; no background actions.
+- Add tests for portrait/landscape viewport detection with injected sizes and verify that the prompt only applies to mobile-web mode.
+
+Acceptance:
+
+- Mobile web renders the Android-style portrait layout and all touch controls remain usable.
+- Landscape mobile web clearly tells the user to rotate and cannot accidentally play behind the prompt.
+- Fullscreen/orientation support is best-effort; unsupported browsers fall back to the rotate prompt.
+- PC web remains desktop-first with no orientation UI.
+
+#### W-05 — Web rendering/quality, loading and performance checks
+
+Scope:
+
+- Confirm the Web build uses the Compatibility renderer and that board, terrain, fog, pieces, highlights, setup and HUD remain readable.
+- PC web uses the desktop presentation; mobile web uses the existing mobile quality profile (decorations/shadows off, reduced 3D scale).
+- Check canvas/device-pixel-ratio behavior, UI text/button sizing, and browser resize/rotation.
+- Measure initial load and an AI turn/match on desktop and mobile-emulated browser contexts; record any frame-time/FPS observations. Do not claim native-device thermal performance.
+- Document WebAssembly size and static-host compression guidance (Brotli/gzip); no COOP/COEP requirement with threads off.
+- Verify no hidden-information regression from the web overlay/HUD.
+
+Acceptance:
+
+- The Web build has no console errors and the 3D board and UI are readable on both layouts.
+- Mobile web uses the mobile quality profile; PC web keeps desktop presentation.
+- Load/frame observations are recorded; hosting/compression guidance is documented.
+- No rules, AI-information or native presentation regression.
+
+#### W-06 — Static hosting docs, browser acceptance suite and screenshots
+
+Scope:
+
+- Document the release export command, `builds/web/` contents, static-host serving (WASM MIME type, optional compression, no special headers for the single-threaded build) and cache-busting guidance. No deployment URL/domain is added unless requested.
+- Add browser acceptance checks:
+  - Desktop Edge/Chrome at 1280×720 and 1920×1080: setup → match → human move → AI reply → game over/rematch → setup; mouse selection, desktop camera and HUD.
+  - Mobile emulation (Android and iOS user agents/touch, portrait): mobile HUD, 44 CSS px controls, touch selection/pan/pinch/long-press, rotate prompt in landscape, safe-area spacing.
+  - PC narrow viewport still uses desktop HUD (device-based rule).
+  - No console errors and no hidden-info leaks.
+- Save and inspect desktop/mobile screenshots; run the existing unit/UI/mobile/AI/demo suite and the Web release export.
+- Update this file with evidence, deviations and hosting notes.
+
+Acceptance:
+
+- Both browser classes match their native counterparts: PC like the Windows desktop game, mobile like the Android portrait game.
+- Every W-02 through W-05 criterion is covered by a unit/layout check, a browser smoke, or a screenshot.
+- The Web release is reproducible and documented; native Android/desktop checks remain green.
+- No Phase 9 networking or persistence work is included.
+
+### 18.2 Recommended batches
+
+| Batch | Tasks | Reason |
+| --- | --- | --- |
+| 1 | W-02, W-03 | Shell/canvas/safe-area foundation and device/metrics selection; these determine the two browser layouts. |
+| 2 | W-04, W-05 | Portrait/fullscreen/rotate behavior, then rendering/quality/performance verification. |
+| 3 | W-06 | Hosting docs, full browser acceptance, screenshots and regression. |
+
+W-01 through W-06 are complete. Phase 8W is complete; real-device browser performance (U-22) and the P7-05 native thermal run remain.
+
+### 18.3 Phase 8W acceptance trace
+
+| Specification / user criterion | Covered by |
+| --- | --- |
+| Mobile browser looks/behaves like the Android build | W-02, W-03, W-04, W-06 |
+| PC browser looks/behaves like the Windows game | W-02, W-03, W-05, W-06 |
+| Device-based layout, not viewport-width | W-03, W-06 |
+| Portrait mobile UI with rotate prompt/fullscreen | W-02, W-04, W-06 |
+| Safe areas and 44px touch targets in browsers | W-02, W-03, W-06 |
+| Static single-threaded hosting without COOP/COEP | W-01, W-05, W-06 |
+| Compatibility renderer and readable 3D/HUD | W-05, W-06 |
+| Web release reproducible; artifacts ignored | W-01, W-06 |
+| Existing Windows/Android/AI behavior unchanged | W-03, W-06 |
+
+### 18.4 Scope boundaries and implementation notes
+
+- Single-threaded WebAssembly only; no SharedArrayBuffer, COOP/COEP requirement, PWA or offline mode.
+- Detection is device-based: a narrow PC window stays desktop; a mobile browser gets the mobile UI.
+- Mobile web is portrait-oriented. Fullscreen/orientation lock is best-effort; the rotate overlay is the guaranteed fallback.
+- Web uses Godot's Compatibility renderer; visual parity with Forward+ is approximate, with layout/interaction parity prioritized.
+- No Phase 9 online multiplayer, save/load, replay, rules, AI, map or editor changes.
+- Web build outputs remain under git-ignored `builds/web/`. The export preset is committed; no deployment target/domain is added.
+- The custom shell and browser checks must not add runtime network dependencies or secrets.
+- Native desktop and Android remain the verified baseline; web-only gating must not alter them.
+
+### 18.5 Verification plan
+
+```bash
+GODOT="/d/Program Files/Godot/godot.exe"
+
+"$GODOT" --headless --path . --import
+"$GODOT" --headless --path . --script res://tests/test_runner.gd
+"$GODOT" --headless --path . --export-release "Web" builds/web/index.html
+python3 -m http.server 8060 --directory builds/web
+
+# Desktop browser smoke (screenshots + console check)
+npx playwright screenshot --channel msedge --viewport-size "1280,720" \
+  --wait-for-timeout 8000 http://localhost:8060/index.html builds/web/web_desktop_setup.png
+npx playwright screenshot --channel msedge --viewport-size "1920,1080" \
+  --wait-for-timeout 8000 http://localhost:8060/index.html builds/web/web_desktop_wide.png
+
+# Mobile emulation smoke (portrait setup/HUD screenshots)
+npx playwright screenshot --channel msedge --device "Pixel 7" \
+  --wait-for-timeout 8000 http://localhost:8060/index.html builds/web/web_android_setup.png
+npx playwright screenshot --channel msedge --device "iPhone 13" \
+  --wait-for-timeout 8000 http://localhost:8060/index.html builds/web/web_ios_setup.png
+
+# Existing native regression
+"$GODOT" --headless --path . --script res://tests/setup_flow_check.gd
+"$GODOT" --headless --path . --script res://tests/mobile_flow_check.gd
+"$GODOT" --headless --path . --script res://tests/mobile_input_check.gd
+"$GODOT" --headless --path . --script res://tests/ai_turn_check.gd
+"$GODOT" --headless --path . --script res://tests/phase8_demo.gd
+"$GODOT" --headless --path . --script res://tests/phase8_ai_soak.gd
+git status --short
+```
+
+- Browser interaction checks (Start Match, touch/mouse, AI turn, rotate prompt) need a short scripted browser run or manual desktop/mobile-browser verification; setup-only screenshots are insufficient.
+- Device-based detection must be verified with Android/iOS user agents and a Windows user agent at both narrow and wide viewports.
+- Record load size, console cleanliness, layout screenshots and frame observations. Do not claim native-device thermal/performance evidence.
+- Native test suite, all demos, Android export and the Web release export must remain green.
+
+### 18.6 Implementation risks
+
+- Browser mobile identification: `web_android`/`web_ios` feature tags exist in the 4.7.2 template; iPadOS may report a Macintosh user agent, so use the touch-point fallback.
+- Browser DPI: `screen_get_dpi()` returns a browser DPI that shrinks dp-based UI; web metrics must use CSS-pixel scaling.
+- Safe areas: `DisplayServer.get_display_safe_area()` may not reflect browser chrome; the custom shell/JS bridge is the reliable source.
+- Fullscreen/orientation lock requires a user gesture and may be rejected; the rotate overlay must be the fallback, not an afterthought.
+- Web uses Compatibility; check fog/piece readability and mobile quality rather than expecting Forward+ parity.
+- The 38 MB WebAssembly payload needs static-host compression for acceptable first load; the web server must serve `application/wasm`.
+- Any web gating must be behind the web platform helper so native desktop/Android behavior and tests stay unchanged.
+
+### 18.7 Phase 8W batch 1 results (2026-11-16)
+
+- W-02 is complete:
+  - Added `web/shell.html` from the exact 4.7.2 web template, preserving all Godot placeholders, with `viewport-fit=cover`, full-viewport/`100dvh` canvas, no page scroll/zoom gestures, safe-area CSS, loading/failure status and a hidden safe-area probe.
+  - Added `window.chessfrontGetSafeInsets()` plus a `window.chessfrontSafeInsetsOverride` test hook. `WebSafeArea` parses/scales the CSS insets into Godot canvas units by devicePixelRatio; `SafeAreaContainer` uses this bridge on web.
+  - Wired the shell through `html/custom_html_shell` in the Web preset.
+- W-03 is complete:
+  - Added `PlatformMode` with a pure feature-based resolver and test overrides: native mobile, `web_android`, `web_ios` and iPadOS Macintosh-plus-touch select the mobile UI; other web clients stay desktop.
+  - `MatchController` now selects mobile/desktop through `PlatformMode` instead of `OS.has_feature("mobile")`.
+  - Added `WebViewport`; web `MobileMetrics` use CSS pixels × devicePixelRatio, so 44dp remains 44 CSS px and setup panels keep their desktop/mobile CSS dimensions. Safe insets scale by the same ratio.
+  - Added unit tests for feature resolution, iPadOS touch, overrides, safe-area parsing/scaling and web metrics, plus `web_layout_check.gd` for setup and MobileHud at web desktop/mobile sizes.
+- Verification:
+  - Unit suite: **2781 assertions / 0 failures**. Compile check: **158 scripts, 0 broken**.
+  - `web_layout_check.gd`: 0 failures (desktop setup panel ≥500px, mobile-safe layout, 44 CSS px controls).
+  - Web release exported and served; custom shell markers present and no `$GODOT_*` placeholders remain.
+  - Browser smoke with Edge/Playwright:
+    - Windows UA 1280×720: desktop setup and desktop HUD match; no console errors.
+    - Pixel 7 (Android UA, DPR 2.63): mobile HUD match; safe-area override applied; 44 CSS px controls; no console errors.
+    - iPhone 13 (iOS UA, DPR 3): mobile HUD match; safe-area override applied; no console errors.
+    - Windows UA 600×900: desktop HUD retained by device rule (narrow desktop layout is intentionally not switched to mobile).
+  - Screenshots inspected: `web_desktop_setup.png`, `web_android_setup.png`, `web_ios_setup.png`, `web_desktop_match.png`, `web_android_match.png`, `web_ios_match.png`, `web_narrow_pc_match.png`.
+  - Native UI/mobile/setup/AI checks and Android APK export remain green.
+- Scope boundaries:
+  - W-04 portrait/fullscreen/rotate prompt and W-05 full rendering/performance acceptance are not implemented yet.
+  - Static hosting docs and the full browser acceptance suite remain W-06.
+  - Web remains single-threaded; P7-05 native thermal evidence remains open.
+- No git commits were created.
+- Next: W-04 (portrait/fullscreen/rotate) and W-05 (rendering/quality/performance).
+
+### 18.8 Phase 8W W-04 results (2026-11-17)
+
+- Implemented:
+  - Mobile web now shows a `Tap to play` overlay after Godot reports ready. The tap requests fullscreen and attempts `screen.orientation.lock("portrait")`; unsupported/rejected requests are non-fatal.
+  - A blocking `Rotate to portrait` overlay appears on mobile web whenever the browser is landscape, including at load before play. PC web never shows either overlay or requests fullscreen.
+  - `MatchController` tracks web orientation/visibility pause state. Landscape mobile web and hidden-tab states cancel pending AI work/gestures and block board/HUD/touch/camera input; returning to portrait/visible resumes the AI turn and pending draw response without consuming extra turns.
+  - `WebViewport` exposes landscape detection, orientation-pause resolution and `notify_ready`; `WebSafeArea`/metrics remain DPR-aware. Shell overlays use the safe-area insets.
+- Browser verification (Edge/Playwright):
+  - Desktop 1280×720: both overlays `display:none`; setup remains interactive.
+  - Pixel 7 portrait: play overlay visible after load; tapping it enters fullscreen (`document.fullscreenElement` true) and hides the overlay.
+  - Rotating to 838×411 landscape shows the blocking rotate overlay; returning to portrait hides it.
+  - Loading directly in landscape shows the rotate overlay before play.
+  - After the tap gate, the mobile match still starts with the MobileHud; no console errors. Screenshots: `web_play_overlay.png`, `web_rotate_overlay.png`, `web_mobile_w04_match.png`.
+  - `web_orientation_check.gd`: landscape pause cancels a pending AI turn and consumes no ply; returning to portrait resumes exactly one AI action; tab visibility pause also cancels/resumes.
+- Verification:
+  - Unit suite: **2794 assertions / 0 failures**; compile check: **160 scripts, 0 broken**.
+  - Web orientation check, web layout check, native UI/mobile/setup/AI checks, layout and picking checks: 0 failures.
+  - Android debug APK rebuilt successfully (28 MB).
+- Limitations:
+  - Fullscreen/orientation lock support remains browser/device-dependent; the rotate overlay is the guaranteed behavior.
+  - Browser checks use Playwright device emulation, not a physical mobile browser session.
+  - W-05 rendering/quality/performance acceptance and W-06 hosting/browser acceptance remain.
+  - P7-05 native thermal evidence remains open.
+- No git commits were created.
+- Next: W-05 (rendering/quality/loading/performance), then W-06.
+
+### 18.9 Phase 8W W-05 results (2026-11-17)
+
+- Rendering/quality:
+  - Web renders through Compatibility. Desktop web keeps the desktop HUD/camera/quality; mobile web keeps the MobileHud and mobile quality profile. Board, pieces, fog and HUD remain readable on both.
+  - Canvas/DPR behavior is correct: desktop 1280×720 at DPR 1; Pixel 7 emulation starts at 411×838 CSS / 1081×2202 canvas, then the mobile DPR cap produces an approximately 824×1676 canvas while CSS layout and 44 px controls stay unchanged.
+  - Added a mobile-browser-only DPR cap of 2.0 in the shell (A-122); desktop DPR 1 is unaffected and native builds are untouched.
+- Loading:
+  - Uncompressed WebAssembly transfer is 39.5 MB (39,515,054 bytes) from the local static server.
+  - Cache-disabled first-run readiness was 8.6 s desktop and 7.0 s mobile emulation; a subsequent run was about 2.2–2.4 s. These are local desktop-host numbers, not production network timings.
+  - Production hosting should serve Brotli/gzip and correct `application/wasm`; no COOP/COEP headers are required for the single-threaded build. Full hosting guidance remains W-06.
+- Frame observations (Playwright/Edge, AMD Radeon 780M via ANGLE, headless):
+  - Desktop 1280×720, AI-first match: 102.2 FPS average, 53.0 FPS 1% low, 33.3 ms max frame. Headless is uncapped; a real browser is vsync-limited.
+  - Mobile emulation pre-cap, AI-first match: 37.3 FPS average, 22.5 FPS 1% low, 50.0 ms max at 1081×2202.
+  - Mobile emulation post-cap, AI-first match: 58.7 FPS average, 32.9 FPS 1% low, 41.6 ms max. The average is near the 60 FPS cap; turn-decision frames still create occasional spikes.
+  - No console errors. `web_desktop_perf_match.png` and `web_android_perf_match2.png` were inspected.
+- Verification:
+  - Unit suite: **2796 assertions / 0 failures**. Compile check: **160 scripts, 0 broken**.
+  - Web layout check, web orientation check and all prior native UI/mobile/setup/AI checks remain green.
+  - Hidden-information behavior is unchanged (same PlayerView/presentation path); no Web-specific reveal path was added.
+- Limitations:
+  - Measurements are desktop-GPU browser emulation, not a physical phone browser (U-22). Real mobile-browser performance still needs testing.
+  - The 39.5 MB uncompressed payload requires host compression for acceptable production first load.
+  - W-06 hosting docs and final browser acceptance remain; P7-05 native thermal evidence remains open.
+- No git commits were created.
+- Next: W-06 (static hosting docs, final browser acceptance, screenshots and regression).
+
+### 18.10 Phase 8W W-06 results (2026-11-17)
+
+- Delivery:
+  - Added `web/README.md`: release export command, local static serving, MIME types (`application/wasm`), no-COOP/COEP note for the single-threaded build, Brotli/gzip guidance (39.5 MB raw, 10.1 MB gzip, 6.9 MB Brotli), caching/versioning guidance, mobile/PC behavior and known boundaries.
+  - Added `web/acceptance_test.js` (Playwright/Edge) and ignored local `node_modules/`. The harness checks overlays, DPR cap, setup/match startup, AI turn, console cleanliness and captures screenshots under `builds/web/acceptance/`.
+  - No hosting URL, domain or credential was added.
+- Browser acceptance result: **0 failures**.
+  - Desktop 1280×720 and 1920×1080: no play/rotate overlays, desktop HUD, AI-first match reaches ply 1, no console errors.
+  - Narrow PC 600×900: stays on the desktop HUD by the device-based rule; no overlays or console errors.
+  - Pixel 7: tap-to-play visible, fullscreen requested, mobile HUD, DPR capped at 2×, AI turn, rotate overlay in landscape and resume in portrait, no console errors.
+  - iPhone 13: same mobile-web sequence, mobile HUD, rotate overlay and no console errors.
+  - Inspected screenshots: `desktop_1280_*`, `desktop_1920_match`, `narrow_pc_match`, `android_play/match/rotate`, `ios_play/match/rotate` under `builds/web/acceptance/`.
+- Test/acceptance coverage:
+  - Unit suite: **2796 assertions / 0 failures**; compile: **160 scripts, 0 broken**.
+  - Web layout/orientation checks and all native UI/mobile/setup/AI/layout/picking checks remain green.
+  - Web release was served for the acceptance run; Android APK remains built from the W-04 verification.
+- Deviations/limitations:
+  - The canvas-only browser harness does not script game-over/rematch or pinch/long-press; those remain covered by the native UI/mobile tests and the same HUD logic. Real-device browser play is recommended.
+  - Browser performance remains emulation evidence (U-22), not physical-phone evidence; P7-05 thermal evidence remains open.
+  - Fullscreen/orientation lock remains best-effort by browser.
+  - Phone testing over a LAN `http://IP` address fails Godot's secure-context check; `web/README.md` now documents USB `adb reverse` to `http://localhost` and HTTPS alternatives.
+- **Phase 8W is complete.**
+- No git commits were created.
+- Next: Phase 9 planning, or a physical phone browser/P7-05 device verification run.
+
+## 19. Phase 9 plan (online multiplayer) — planned 2026-11-17
+
+Phase 9 adds online human-vs-human play on separate devices. A headless Godot server on this PC is authoritative: it owns rooms, validates every action, randomizes sides/first player, and sends each client only its own fog-limited view. The client remains the single-threaded Web build hosted on GitHub Pages; a Cloudflare quick tunnel exposes the local server for testing. The room owner selects the map before every match, enemy gold is hidden, and a 90-second reconnect window covers client drops.
+
+Save/load, replay and move takeback are explicitly excluded by user decision (A-123). The design document's Phase 9 persistence/replay acceptance is deferred; the deterministic engine remains the future foundation. Planning wrote no code; batch 1 (P9-01/P9-02) is now implemented and recorded in Section 19.8, and `game-design.md` remains unchanged.
+
+### 19.1 Task breakdown
+
+| ID | Task | Depends on | Status |
+| --- | --- | --- | --- |
+| P9-01 | Balance tuning and test/AI re-baseline | Phase 8W complete | Done |
+| P9-02 | Protocol, room data, action and view codecs | P9-01 | Done |
+| P9-03 | Headless authoritative server core | P9-02 | Done |
+| P9-04 | Server draw, reconnect, rematch and leave lifecycle | P9-03 | Done |
+| P9-05 | Online client transport, filtered state and session boundary | P9-02, P9-04 | Done |
+| P9-06 | Online mode, setup and lobby UI | P9-05 | Done |
+| P9-07 | Online match presentation and lifecycle | P9-05, P9-06 | Done |
+| P9-08 | GitHub Pages deployment, tunnel runbook and acceptance | P9-07 | Done |
+
+#### P9-01 — Balance tuning and test/AI re-baseline
+
+Scope:
+
+- Centralize and apply the user's balance values:
+  - `STARTING_GOLD = 2` per player at match creation.
+  - Mine production cycle = 6 completed plies (3 rounds; one round is both players acting). The current four-ply constant changes to six, not two-to-three.
+  - `DEFAULT_TURN_LIMIT_PLIES = 200` (100 turns per player); the limit remains per-match configurable.
+- Update `GameState._initialize_gold`, `EconomySystem` cycle handling, HUD/ply labels (including the mobile placeholder) and any snapshot expectations so no hardcoded 120 or zero-gold assumptions remain.
+- Recalibrate tests and demos that assert absolute gold totals or turn limits, including the `phase7_soak`/P7-05 120-ply default and the AI soak. At minimum cover: initial gold 2/2; no mine production after 5 plies; token/payout after 6; turn-limit draw at 200, not 120; UI label `Ply x / 200`.
+- Re-run the deterministic AI-vs-AI soak at 200 plies with 2 starting gold and 6-ply cycles on all shipped maps and both first-player choices. Record outcomes, action counts, timing and whether matches still end by turn-limit draw (U-19/U-27).
+- Update this file and user-facing documentation with the new defaults and the design-document divergence (A-130). Do not edit `game-design.md`. Change P7-05's stated soak target to 200 plies; it remains Blocked until device evidence exists.
+
+Acceptance:
+
+- New matches start with 2 gold per player; a mine produces on the sixth completed ply, not the fourth.
+- The default turn limit is 200 plies and the HUD displays it; configurable test limits still work.
+- All prior unit/UI/mobile/AI/demo checks pass after recalibration; the AI soak is deterministic and terminates.
+- The new balance values and their rationale are recorded; no unrelated rules changes are made.
+
+#### P9-02 — Protocol, room data, action and view codecs
+
+Scope:
+
+- Add a versioned network protocol module:
+  - `PROTOCOL_VERSION`, message-type constants, envelope fields, error codes, maximum message size and JSON encode/decode with type/shape validation.
+  - Handshake rejects a client/server protocol mismatch with a clear error.
+- Add serializable action codecs for `MoveAction`, `RecruitAction`, `BuildBridgeAction`, `DestroyBridgeAction` and `PassAction`: type tag, fields, array-form coordinates, integer/type bounds and deterministic round-trip. Do not serialize Godot objects.
+- Add a per-player view codec. It includes:
+  - `map_id`, map format version, local player, `ply`, active player, turn limit, game-over/winner/draw reason, public draw-offer state.
+  - Own gold only. Enemy gold is never present.
+  - Known units (id/type/owner/tile), known bridges, explored and visible tiles, known mine tiles, visible gold-token tiles, own deployment tiles.
+  - It excludes hidden units, enemy gold, unexplored terrain/mines/tokens and hidden event data.
+- Add a six-character room-code generator/validator using an unambiguous alphabet and a private per-player token generator; define a pure room-state model (owner/joiner slots, tokens, phase, map, presence, assigned sides/first, pending request).
+- Add tests for action/view round-trips, malformed/oversized/mismatched messages, room-code collisions/length, token uniqueness, deterministic view output and absence of enemy gold/hidden information.
+
+Acceptance:
+
+- Every action and view survives encode/decode without losing required data.
+- Invalid, oversized or version-mismatched messages are rejected, not partially applied.
+- Serialized views contain no enemy gold, hidden units, unexplored state or hidden event details.
+- Room codes/tokens are valid, unique and safe to display in the lobby.
+
+#### P9-03 — Headless authoritative server core
+
+Scope:
+
+- Add a headless server entry point using Godot's `WebSocketServer`, with configurable port and bind address; default bind to `127.0.0.1`. Poll clients in a headless `SceneTree`/server loop and expose a command-line server mode for local testing.
+- Implement room lifecycle basics:
+  - Create a room and return a room code; join by code; reject full/unknown/closed rooms; own/join slots; per-player tokens.
+  - Owner selects a map from `MapLibrary.list_entries()`; server validates it. Owner starts only when both players are present and a valid map is selected.
+  - On start, randomly assign sides and first player with an injectable RNG, record the assignment, load the map, create the authoritative `GameState` with the new balance defaults, and send `match_started` to both clients.
+- Implement action handling:
+  - Accept only `submit_action` intents from the player whose turn it is; validate the expected ply/action id, deserialize the action and resolve it through `ActionResolver` against the active player's `PlayerView`.
+  - Reject unauthorized, stale, duplicate or malformed actions without changing state.
+  - After a successful action, broadcast each player's updated filtered view and only the events that player is entitled to see. Support move, capture, ambush, recruit, bridge, pass, gold and game-over reporting.
+  - Do not send a full `GameState` or enemy gold to any client.
+- Add connection/room limits (max rooms/clients, message size, basic request throttling), protocol handshake and clear error replies.
+- Add a headless integration test that starts the server on an ephemeral local port, connects two WebSocket clients, creates/joins a room, selects a map, starts a match with seeded random assignment, plays a scripted sequence and validates both views and rejection paths.
+
+Acceptance:
+
+- Two headless clients can complete a scripted online match through the authoritative server.
+- Each client receives only its own view; hidden units, enemy gold and hidden events are absent from the wire payload.
+- Invalid player/turn/action messages are rejected without mutating the match.
+- Random side/first assignment is valid, recorded and reproducible under a test seed.
+
+#### P9-04 — Server draw, reconnect, rematch and leave lifecycle
+
+Scope:
+
+- Add server-side draw requests: offer, accept, decline; no turn is consumed. The pending offer is public to both players and is cleared on decline, acceptance, leave or match end.
+- Add reconnect/session handling:
+  - Heartbeat/ping with configurable interval and timeout; detect dead clients.
+  - On unexpected disconnect, pause the match and start a 90-second grace timer (test override allowed). Notify the connected player; keep the authoritative state and pending requests.
+  - Accept `resume_room` with room code + token; replace a stale connection for the same slot; send the full current view, match assignment and pending request state. Reject invalid/expired tokens.
+  - After grace expiry, abort the match/room with no winner and notify the remaining player; no persistence across server/tunnel restart (A-128/A-134).
+- Add rematch/leave lifecycle:
+  - Game over → both players choose “Another Match” → return to lobby; owner re-selects the map; each new match re-rolls sides/first.
+  - “Leave” closes the room; the other player returns to setup/lobby with a clear message. Mid-match leave aborts with no winner.
+  - Room cleanup/idle expiry and maximum-room limits.
+- Add tests for draw offer/accept/decline, reconnect within/after grace, invalid/duplicate tokens, stale connection replacement, pending-request resync, rematch re-roll, leave/close and room cleanup.
+
+Acceptance:
+
+- Draw state is server-authoritative and consistent on both clients.
+- A disconnected client can resume within the grace window and receive the exact current match view; after expiry, both clients see a clean abort.
+- Another Match returns to the lobby and re-randomizes; leaving closes the room without awarding a win.
+- No save/load or replay is added.
+
+#### P9-05 — Online client transport, filtered state and session boundary
+
+Scope:
+
+- Add an `OnlineClient` using `WebSocketPeer`:
+  - Normalize pasted `https://`/`http://` URLs to `wss://`/`ws://`; reject `ws://` from an HTTPS page with a clear error.
+  - Connection state machine: disconnected, connecting, handshaking, connected, in-room, in-match, reconnecting, failed.
+  - Heartbeat, automatic reconnect with backoff, private token storage for the room (local/session storage), and clean token clearing on intentional leave.
+  - A fake transport/test double so connection, reconnect and message flows can be tested headlessly.
+- Build a client-side filtered match state/view from server snapshots: own units and detected enemies, explored/visible terrain, known mines/tokens, known bridges, own gold, public ply/active/turn-limit/game-over/draw state. Never construct or retain a full authoritative `GameState`.
+- Add a match-session/action-gateway boundary:
+  - Local/AI sessions keep the current `ActionResolver` path.
+  - Online sessions submit typed action intents and apply only server views/results; online code never calls `ActionResolver` locally.
+  - Route HUD reads that currently touch `_model.state` through model accessors where needed, without changing local HUD behavior.
+- Add tests for URL normalization, protocol handshake, message encode/decode, filtered state construction, hidden-data absence, action intent/response application, reconnect token handling and no local online resolution. Keep the AI path unchanged.
+
+Acceptance:
+
+- The client can connect to the local server, create/join a room, receive filtered state and submit an action through the gateway.
+- No online client path creates or trusts a full authoritative state or resolves an action locally.
+- Enemy gold, hidden units and unexplored data are absent from the client model.
+- Local AI and existing setup/match tests continue to pass.
+
+#### P9-06 — Online mode, setup and lobby UI
+
+Scope:
+
+- Add an enabled `online_pvp` mode resource (`ONLINE_HUMAN`) and statically preload it in `MatchModeRegistry`, so the data-driven mode list contains “Play Online” alongside “Play vs AI” and exports reliably.
+- Branch `MatchSetup` when the selected mode is online: mode page → online setup overlay, without the local map/side/first pages. The local AI flow remains unchanged.
+- Add an online setup/lobby overlay with:
+  - Server URL entry (remember the last URL; normalize; test connection; protocol/version errors).
+  - Create room (show/copy the code) and join room (enter a six-character code).
+  - Lobby display of room code, both players, connection state and current map. Only the owner can choose the map or start; the joiner sees the selection and waits.
+  - A notice that sides and first player are randomized at match start.
+  - Leave/back behavior and clear disconnected/room-closed/aborted states.
+  - Safe-area and 44dp touch targets on portrait mobile, the same constrained panel on desktop, focus and Android back behavior.
+- Add layout/flow tests at portrait reference sizes with simulated insets and a desktop size; use the fake client to cover create/join/invalid URL/invalid code/owner-only map/start/leave and error states.
+
+Acceptance:
+
+- “Play Online” appears from the data-driven mode list; choosing it opens the server → create/join → lobby flow.
+- The room owner alone selects the map and starts; the joiner sees the map and waits.
+- Random side/first assignment is shown when the match starts; no local side/first selector is added to online mode.
+- Every online control is inside the safe area and at least 44dp on mobile; desktop layout and back behavior remain usable.
+- No offline AI/setup behavior regresses.
+
+#### P9-07 — Online match presentation and lifecycle
+
+Scope:
+
+- Start an online match from `match_started`: load the selected map, apply the assigned local side to the camera/model, show You/Opponent labels, and gate input on the server-reported active player. Never run the AI turn loop in online mode.
+- Route board/HUD actions through the online session: move, promotion, recruit, bridge build/destroy, pass and draw. Lock input while an action is in flight; show server rejection/enforcement clearly; apply the returned view and permitted events.
+- Animate/log only events the local player is entitled to see, using the existing fog-safe reporting rules. Do not reveal hidden unit types/tiles, enemy gold or hidden ambusher details.
+- Apply hidden enemy gold in both HUDs: own gold is visible; the opponent's gold is unknown/hidden during the match and at game over (A-129). Keep mine income/affordability derived from the local view only.
+- Add online game-over and connection UI:
+  - “Another Match” and “Leave Room” instead of the local Rematch/Return to Setup wording, routed to the server lobby/leave flow.
+  - Opponent disconnected/waiting and self reconnecting overlays with the grace countdown; resume the board on success and cleanly abort on failure.
+  - Web visibility/orientation pause must not stop the WebSocket; reconnect on resume if the socket died.
+- Add integration tests with a fake or local server for turn gating, action round-trip, promotion, recruit/bridge/pass, draw, game over, another/leave, hidden-gold/log checks, reconnect/resume, and desktop/mobile layout. Verify no AI loop runs in online mode.
+
+Acceptance:
+
+- A complete online match runs from lobby through game over, another match and leave on desktop and mobile layouts.
+- Each local HUD shows only its own gold and entitled information; no hidden action is animated or logged.
+- Input, promotion, recruitment, bridges and draw requests work through the server; invalid actions are rejected visibly.
+- Reconnect resumes the same match within the grace window; expiry aborts cleanly.
+- AI mode, local setup and the existing native HUD behavior remain intact.
+
+#### P9-08 — GitHub Pages deployment, tunnel runbook and acceptance
+
+Scope:
+
+- Add a GitHub Pages deployment path for the Web build:
+  - Prefer a pinned GitHub Actions workflow that installs Godot 4.7.2 + web export templates, exports the `Web` preset and deploys the artifact to Pages; document a manual `gh-pages` fallback if CI template provisioning is unavailable.
+  - Add `.nojekyll`; verify relative `index.js`/`index.wasm`/`index.pck` paths work under the repository subpath and that the wasm MIME type is correct. Do not commit `builds/` to `main`.
+- Add an online runbook covering:
+  - The headless server command on this PC, localhost binding, `cloudflared` quick-tunnel command, HTTPS→WSS URL entry and the fact that the URL changes per tunnel run.
+  - Keeping the PC awake/online, firewall/localhost safety, room-code/token handling and connection limits.
+  - That quick tunnels are public/testing-only; a permanent server host/domain is U-20, and server/tunnel restarts lose rooms because save/load is excluded.
+  - Protocol/build/map version checks and the reconnect-only-covers-client-drops limitation.
+- Extend browser acceptance to two clients:
+  - Start the local headless server and static Web server; open two browser contexts, create/join, select a map, start, play scripted moves, verify You/Opponent views, hidden enemy gold/units, draw and game-over/another/leave.
+  - Simulate a client reload/reconnect within the grace window; verify state resumes; verify expiry aborts.
+  - Run desktop and mobile-emulated layouts; capture and inspect screenshots; assert no console errors.
+  - Smoke-test the GitHub Pages deployment and, if available, a PC + phone quick-tunnel session. Do not claim physical-device performance or thermal acceptance.
+- Run the full Phase 1–8 regression, all demos, UI/mobile/setup/AI/online checks, Web release, project/3D/compile checks and Android debug export. Update this file with evidence, deviations and new unresolved items.
+
+Acceptance:
+
+- The Web client is deployable from GitHub Pages and connects to the local server through the documented tunnel.
+- Two browser clients can complete the full room → match → another/leave flow with no hidden-information leaks or console errors.
+- Reconnect works within the grace window and fails cleanly after it; server/tunnel restart limitations are documented.
+- The 200-ply/2-gold/6-ply balance changes are reflected in tests/docs, and all prior native/AI/Web checks remain green.
+- No save/load, replay or takeback is added.
+
+### 19.2 Recommended batches
+
+| Batch | Tasks | Reason |
+| --- | --- | --- |
+| 1 | P9-01, P9-02 | Balance first so server/client share one ruleset, then the pure protocol/view/room codecs; both are headless and easy to verify. |
+| 2 | P9-03, P9-04 | Authoritative server core, then draw/reconnect/rematch lifecycle; these can be tested with two headless clients before any UI exists. |
+| 3 | P9-05, P9-06 | Client transport/filtered state/session boundary, then the online setup/lobby UI; this is the first point where a user can create and join a room. |
+| 4 | P9-07, P9-08 | Online match presentation/lifecycle, then Pages deployment, tunnel runbook and two-browser acceptance. |
+
+**Batch 1 (P9-01 + P9-02)**, **batch 2 (P9-03 + P9-04, Section 19.9)**, **batch 3 (P9-05 + P9-06, Section 19.10)** and **batch 4 (P9-07 + P9-08, Section 19.11) are complete.** Phase 9 is complete. P9-01 re-baselined the rules and AI soak; P9-02 fixed the wire format and information boundary; P9-03/P9-04 added the authoritative server and its lifecycle; P9-05/P9-06 added the online client/session boundary and Play Online lobby; P9-07/P9-08 added the online board/lifecycle, Pages workflow, runbook and two-browser acceptance. Next: review Phase 9 and decide the next phase; persistence/replay remains deferred.
+
+### 19.3 Phase 9 acceptance trace
+
+| User / specification criterion | Covered by |
+| --- | --- |
+| Mode select → server URL → create/join room → lobby → match | P9-05, P9-06 |
+| Mode list remains data-driven and adds “Play Online” | P9-06 |
+| Room creator selects the map before every match | P9-03, P9-06 |
+| Sides and first player are randomized server-side | P9-03, P9-04 |
+| Game over offers another match or leave | P9-04, P9-07 |
+| Enemy gold is not visible | P9-02, P9-05, P9-07 |
+| Each client receives only its own fog-limited view | P9-02, P9-03, P9-05, P9-08 |
+| Server is authoritative; actions are validated by the rules engine | P9-03, P9-05 |
+| Client is served from GitHub Pages; server runs on this PC via a quick tunnel | P9-08 |
+| Reconnect window covers web/mobile disconnects | P9-04, P9-07, P9-08 |
+| No save/load, replay or takeback | Scope boundary; A-123 |
+| Balance changes: 2 starting gold, 6-ply mine cycle, 200-ply limit | P9-01 |
+| Desktop/mobile presentation and safe-area behavior remain valid | P9-06, P9-07, P9-08 |
+| Existing AI, setup, native and Android behavior remains intact | P9-07, P9-08 |
+| Automated evidence for protocol, authority, leaks and browser flows | P9-02 through P9-08 |
+
+### 19.4 Architecture and online protocol
+
+Topology:
+
+```text
+GitHub Pages (single-threaded WebAssembly client)
+        │  wss://
+Cloudflare quick tunnel (testing only)
+        │  ws://127.0.0.1:<port>
+Headless Godot authoritative server on this PC
+```
+
+- The server is one process and owns multiple rooms. It is not run inside the browser or inside a player's client. The GitHub Pages host cannot run the server.
+- The client uses `WebSocketPeer`; the server uses `WebSocketServer`. ENet is not available in web exports.
+- A room has an owner and a joiner, a six-character code, private player tokens, a selected map and a phase (`lobby`, `match`, `game_over`, `closed`). The owner controls the map and start; both players must be present.
+- The server creates the authoritative `GameState`, applies `ActionResolver`, and serializes a per-player view after every successful action. It never broadcasts a full `GameState`.
+- A network view contains only: map id/version, local player, ply, active player, turn limit, game-over/winner/draw state, public draw offer, own gold, known units, known bridges, explored/visible tiles, known mines, visible tokens and own deployment tiles. Enemy gold and hidden state are omitted.
+- Client actions are intents: `{action_id, expected_ply, action}`. The server checks the sender, slot, active player and expected ply, resolves once and rejects stale/duplicate intents. Clients never apply an action locally in online mode.
+- The protocol is versioned. A client/server mismatch is rejected before a room is usable. Map ids and format versions must match the shipped maps.
+- Random assignment happens at each match start: server RNG chooses each player's side and the first player, records the result, and re-rolls on another match. Clients never roll.
+- Reconnect uses a private token, a heartbeat and a 90-second pause window. Resume sends the current view and pending request state; duplicate connections replace stale ones. Expiry aborts with no winner.
+- Draw offers are pending server state; accept/decline never consumes a turn. “Another Match” returns to the lobby and re-rolls assignment; leaving closes the room.
+- GitHub Pages hosts only the static client. A permanent server host/domain is not part of this phase; the quick tunnel is public, ephemeral and unsuitable for production.
+
+### 19.5 Scope boundaries and implementation notes
+
+- Online play is implemented for the Web client; native desktop/Android remain regression targets. If native online is enabled later, Android requires an INTERNET permission check. No hotseat is introduced.
+- No save/load, replay or takeback (A-123). No server restart recovery; reconnect covers client drops only. No accounts, matchmaking, chat, spectators, rankings or public lobby browser.
+- No browser-hosted server, WebRTC peer authority, full-state broadcast or client-side authoritative action resolution.
+- The room owner selects the map; only sides and first player are random. No random map generation or map editing is added.
+- Quick tunnels are testing-only; the PC must stay awake/online and the tunnel URL changes on restart. A permanent server host/domain remains U-20.
+- Balance values are exactly 2 starting gold, 6-ply mine cycles and 200 default plies. `game-design.md` is not edited; the divergence is recorded here and P7-05's target is re-baselined.
+- `MatchConfig` remains the local/AI configuration; the online match receives server-assigned map/side/first data after `match_started`. The online setup does not expose local side/first selection.
+- Skills consulted for this plan: `godot-multiplayer` (authoritative server, WebSocket vs ENet, client intent validation), `godot-export` (Web/headless export), `godot-gdscript-headless-testing` (server tests), `godot-ui-control`/`game-ui-ux` (lobby safe areas/focus) and `godot-nodes-scenes` (server/client node structure).
+- Planning wrote no Phase 9 code; batch 1 (P9-01/P9-02) is implemented in Section 19.8.
+
+### 19.6 Verification plan
+
+After implementation, run the existing Phase 1–8 suite plus:
+
+```bash
+GODOT="/d/Program Files/Godot/godot.exe"
+
+"$GODOT" --headless --path . --import
+"$GODOT" --headless --path . --script res://tests/test_runner.gd
+"$GODOT" --headless --path . --script res://tests/test_online_protocol.gd
+"$GODOT" --headless --path . --script res://tests/online_server_check.gd
+"$GODOT" --headless --path . --script res://tests/online_setup_layout_check.gd
+"$GODOT" --headless --path . --script res://tests/online_setup_flow_check.gd
+"$GODOT" --headless --path . --script res://tests/online_match_check.gd
+"$GODOT" --headless --path . --script res://tests/phase8_ai_soak.gd
+"$GODOT" --headless --path . --script res://tests/phase8_demo.gd
+
+# Local online server + static client for browser acceptance
+"$GODOT" --headless --path . --script res://scripts/net/server_main.gd -- --port 9000
+python3 -m http.server 8060 --directory builds/web
+node web/acceptance_test.js
+
+# Release/export checks
+"$GODOT" --headless --path . --export-release "Web" builds/web/index.html
+mkdir -p builds/android
+"$GODOT" --headless --path . --export-debug "Android" builds/android/Chessfront-debug.apk
+
+# Existing native/UI/mobile/AI regression
+"$GODOT" --headless --path . --script res://tests/setup_layout_check.gd
+"$GODOT" --headless --path . --script res://tests/setup_flow_check.gd
+"$GODOT" --headless --path . --script res://tests/mobile_layout_check.gd
+"$GODOT" --headless --path . --script res://tests/mobile_flow_check.gd
+"$GODOT" --headless --path . --script res://tests/mobile_input_check.gd
+"$GODOT" --headless --path . --script res://tests/hud_layout_check.gd
+"$GODOT" --headless --path . --script res://tests/ui_flow_check.gd
+"$GODOT" --headless --path . --script res://tests/ai_turn_check.gd
+"$GODOT" --headless --path . res://scenes/main/Main.tscn --quit-after 2
+"$GODOT" --headless --path . res://editor/MapEditor.tscn --quit-after 2
+python3 "C:/Users/Daniel/.qoder/skills/godot-nodes-scenes/scripts/check_godot_project.py" .
+"$GODOT" --headless --path . --script "C:/Users/Daniel/.qoder/skills/godot-3d-essentials/assets/check_3d_scene.gd" -- res://scenes/main/Main.tscn
+"$GODOT" --headless --path . --script "C:/Users/Daniel/.qoder/skills/godot-gdscript/assets/check_scripts_compile.gd"
+git status --short
+```
+
+- `online_server_check.gd` starts an in-process server on an ephemeral port and uses two WebSocket clients; it must not depend on an external terminal or the quick tunnel.
+- Payload leak tests must assert no enemy gold, hidden unit ids/tiles, unexplored terrain/mines/tokens or hidden event details are sent to the wrong player.
+- Reconnect tests use a short test override for the 90-second grace and heartbeat intervals; production values stay at 90 seconds.
+- UI layout tests use simulated safe-area insets and a fake online transport, so they do not need a live tunnel.
+- Browser acceptance opens two contexts against the local server and static build; it verifies create/join, map ownership, random assignment, action round-trip, hidden information, draw, game over, another/leave, reload/reconnect and console cleanliness.
+- GitHub Pages and quick-tunnel smoke tests are manual/integration evidence. Do not claim physical-phone performance or thermal acceptance; P7-05 remains Blocked until a recorded 200-ply device run exists.
+
+### 19.7 Implementation risks
+
+- **Server/client drift:** a Pages client and local server from different builds can disagree on protocol, balance or maps. Use a version handshake and reject mismatches with a clear message.
+- **Hidden-information leaks:** views, logs, animations, HUD labels, error messages and reconnect snapshots can all leak. Centralize per-player serialization/events and test the wire, not just the board.
+- **Client authority regression:** `PresentationModel` currently resolves actions locally. The session boundary must be enforced by tests; no online UI path may call `ActionResolver`.
+- **HUD coupling:** HUD code reads `GameState` directly. Introduce model accessors carefully so local/AI presentation and tests remain unchanged.
+- **Reconnect races:** refresh, duplicate tabs, stale sockets and in-flight actions can double-apply or resurrect an old turn. Use tokens, action ids/expected ply and stale-connection replacement; test them.
+- **Random assignment:** server-only RNG and recorded results are required; client-side rolls or unrecorded assignment break fairness/reproducibility.
+- **Tunnel/browser behavior:** quick-tunnel URLs change, idle WebSockets can be dropped, mobile backgrounding can suspend timers and WSS/TLS behavior varies. Heartbeats and reconnect are required; local tests are not enough.
+- **Host availability:** the server/PC/tunnel must stay awake and online; no save/load means a restart loses rooms. Document this rather than implying persistence.
+- **GitHub Pages delivery:** the 39.5 MB wasm needs correct MIME/compression and cold-load patience; Pages cannot host the server or set arbitrary headers. The deployment workflow/artifact must not commit builds to `main`.
+- **Balance churn:** starting gold and 6-ply cycles change AI openings and many absolute-value tests. Re-baseline the whole suite and soak; do not only change constants.
+- **P7-05 mismatch:** existing 120-ply thermal evidence is stale once P9-01 lands. Keep P7-05 Blocked and update its target to 200 plies.
+- **Public tunnel abuse:** add room/client/message limits and rate limiting; the quick tunnel URL is not a secret and exposes the local server to the internet. Bind to localhost and do not expose other services.
+
+### 19.8 Phase 9 batch 1 results (2026-11-17)
+
+- P9-01 is complete:
+  - Added `GameConfig.STARTING_GOLD = 2`, `MINE_CYCLE_PLIES = 6` and `DEFAULT_TURN_LIMIT_PLIES = 200`; `GameState` initializes both players with the configured starting gold, and `EconomySystem` uses the six-ply cycle.
+  - Updated the mobile/desktop ply labels (including the static scene placeholder), `phase7_soak` default, and all tests/demos that assumed zero starting gold or a four-ply cycle. Isolated mechanics tests use a new test-only `MovementTestUtils.clear_gold`; the starting-gold behavior is asserted explicitly.
+  - Recalibrated economy integration/snapshot/mine tests to six-ply cycles, recruitment and pass-gating fixtures to the new starting balance, and draw tests to the 200-ply default.
+  - The 200-ply AI soak completed with 0 failures: borderlands ended by King capture for both first-player choices (91 plies with P1 first, 108 with P2 first), highland_woods and river_crossing ended by turn-limit draw for both first players, with zero action fallbacks and 23.3 s total. Outcomes are recorded in U-19/U-27.
+- P9-02 is complete:
+  - Added `NetProtocol` (version 1, 64 KB limit, message types/error codes, strict JSON envelope encode/decode, request ids, player-token generation).
+  - Added `GameActionCodec` for Move/Recruit/BuildBridge/DestroyBridge/Pass with type tags, coordinate arrays, bounds/promotion/purchasable checks and JSON-number handling.
+  - Added `NetworkViewCodec`: per-player views include map/version, local/active player, ply, turn limit, game-over/draw state, own gold, known units/bridges, explored/visible tiles, known mines, visible tokens and deployment tiles. Enemy gold, hidden units and unexplored state are absent; decode validates the map/version and reconstructs a `PlayerView`; leaks and malformed data are tested.
+  - Added `RoomCode` (six-character unambiguous codes, normalization, seeded deterministic generation) and `OnlineRoomState` (owner/joiner slots, private tokens, presence, map, start gating, side/first assignment, pending requests, token-free summary).
+  - Added `test_net_protocol.gd`, `test_game_action_codec.gd`, `test_network_view_codec.gd` and `test_room_state.gd`.
+- Verification:
+  - Unit suite: **2987 assertions / 0 failures** (174 new assertions over the pre-batch suite).
+  - Compile check: **169 scripts, 0 broken**.
+  - All eight Phase 1–8 demos: 0 failures. Setup/HUD/UI/mobile/AI/web layout/orientation/picking checks: 0 failures.
+  - 200-ply Phase 7 rendered proxy soak: 0 failures; avg 51.2 FPS, 1% low 24.8 FPS, max frame 143.1 ms, 77.2 MB. This is proxy evidence only; P7-05 remains Blocked.
+  - Web release and Android debug APK rebuilt successfully; APK signed/verified.
+- Scope boundaries:
+  - No WebSocket server/client, room UI or online match is implemented yet. P9-03/P9-04 are next.
+  - No save/load, replay or takeback. No change to `game-design.md`.
+- No git commits were created.
+- Next: implement P9-03 and P9-04 as batch 2, recorded in Section 19.9.
+
+### 19.9 Phase 9 batch 2 results (2026-11-17)
+
+- P9-03 is complete:
+  - Added `OnlineServer`, a transport-independent authoritative core with injectable RNG. It enforces a HELLO handshake, version rejection, room/client/message limits, a 40-message-per-second connection throttle, and a token-free room summary.
+  - Rooms support create/join by six-character code (unknown/full/closed rejected), owner/joiner slots and private tokens. Only the owner may select a map from the shipped library or start; start requires both players connected and a validated map.
+  - At every start the server rolls the owner/joiner sides and the first player independently, records the assignment in `assignment_history`, loads the `GameState` with the P9-01 defaults (2 gold, 200-ply limit) and sends `match_started` with the per-player view and assignment.
+  - Actions are intents `{action_id, expected_ply, action}`: the server checks room phase, pause state, sender seat, active player, expected ply, duplicate action id and action decoding, then resolves through `ActionResolver`. Rejections return `ACTION_RESULT` with an error code and leave state untouched.
+  - After a successful action each client receives only its own `STATE` view and entitled `EVENT` entries (move, capture, ambush, recruit, bridge, pass, own gold, visible tokens, game over). Views keep only own gold, known units, known mines/bridges and explored/visible tiles; no full `GameState`, enemy gold or tokens are sent.
+  - Added `WebSocketServerHost` (`TCPServer` + one `WebSocketPeer` per stream, outbound buffering until OPEN) and `server_main.gd` (`--port`, `--bind`, default `127.0.0.1:9000`) for headless CLI use. This substitutes for the unavailable `WebSocketServer` class (A-135).
+  - Added `test_online_server.gd` (13 core/lifecycle tests) and `online_server_check.gd`, which starts a host on an ephemeral port, connects two real WebSocket clients and runs create/join/map/start, seeded assignment, three accepted actions, wrong-turn/stale/duplicate rejections, hidden-view checks, draw, rematch, reconnect and leave.
+- P9-04 is complete:
+  - Draw offers are pending server state; accept/decline never consume a turn. A non-offerer accepts or declines, self-accept is rejected, and the pending offer remains resumable and is cleared on decline, acceptance, match end, rematch or leave.
+  - Heartbeats send PING every 15 s and drop clients after 45 s without traffic. An unexpected disconnect pauses a running match, records the paused token, starts a production 90-second grace deadline (test override supported) and notifies the connected player.
+  - `RESUME_ROOM` accepts room code + private token, rejects invalid/expired tokens and closed rooms, replaces a stale connection for the same token without pausing, and restores the current view, assignment and pending request. A duplicate connection for the still-connected opponent does not unpause the other player's grace window; the match unpauses only when both seats are connected.
+  - Grace expiry closes the room with no winner, clears pending state and tells the remaining player (`match_aborted`). Leave closes the room immediately, notifies the opponent (`room_closed`, mid-match flagged) and awards no winner. Idle lobby rooms are cleaned up; max room/client limits are enforced.
+  - “Another Match” requires both game-over votes, returns to the lobby, clears the map/state so the owner re-selects, and re-rolls sides/first on the next start.
+- Verification:
+  - Unit suite: **3122 assertions / 0 failures** (135 new assertions over batch 1).
+  - Compile check: **176 scripts, 0 broken**.
+  - Real WebSocket check: **0 failures** (two clients, full room → match → draw → rematch → reconnect → leave flow, hidden-unit/gold checks, no tokens on the wire); CLI server boot prints the listening address and exits cleanly.
+  - All eight Phase 1–8 demos: 0 failures. Setup/HUD/UI/mobile/AI checks: 0 failures. Main and Map Editor boots: exit 0. Project check: 0 errors/0 warnings in 401 files; 3D scene check: 0 problems.
+  - Phase 8 AI soak: 0 failures, 25.6 s, unchanged P9-01 outcomes and zero fallbacks. Phase 7 rendered proxy soak: 0 failures, 200 plies, avg 58.9 FPS, 1% low 52.6 FPS, max 142.4 ms, 77.2 MB (proxy only; P7-05 remains Blocked).
+  - Web release exported (`builds/web/index.wasm` 38 MB, `index.pck` 2.2 MB). Android debug APK rebuilt (30 MB), zipaligned, v2/v3 signature verified.
+- Scope boundaries:
+  - No online client transport, lobby/setup UI or online match presentation exists yet; P9-05/P9-06 are next. Rooms are in memory only; no save/load, replay or takeback, and no restart recovery.
+  - `game-design.md` is unchanged. No git commits were created.
+- Server run command (localhost only): `"/d/Program Files/Godot/godot.exe" --headless --path . --script res://scripts/net/server_main.gd -- --port 9000 --bind 127.0.0.1`.
+- Next: implement P9-05 (online client transport, filtered state and session boundary) and P9-06 (online mode, setup and lobby UI) as batch 3.
+
+### 19.10 Phase 9 batch 3 results (2026-11-17)
+
+- P9-05 is complete:
+  - Added `OnlineTransport`, `WebSocketTransport` and `FakeOnlineTransport` (test double), plus `OnlineStorage` using `sessionStorage`/`localStorage` on web and `user://online_session.cfg` natively. Tokens are URL/room-scoped; the last server URL is remembered; intentional leave/disconnect clears the session.
+  - Added `OnlineClient` with the required state machine (`disconnected`, `connecting`, `handshaking`, `connected`, `in_room`, `in_match`, `reconnecting`, `failed`), https/http → wss/ws normalization, `ws://` rejection on HTTPS pages, HELLO/WELCOME version handshake, PING/PONG, token-based resume, exponential reconnect backoff (8 attempts), handshake/silence timeouts, duplicate-session handling and clear room-closed/aborted errors.
+  - Added `ClientMatchState` and `OnlineMatchSession`: the server view is validated and decoded into a fog-limited `PlayerView` with own units/detected enemies, explored/visible terrain, known mines/tokens, known bridges and own gold only. The session exposes an action-intent gateway (`expected_ply` + action id) and never constructs a `GameState` or calls `ActionResolver`.
+  - Routed desktop/mobile HUD reads through new `PresentationModel` accessors (`has_state`, `is_game_over`, `game_winner`, `game_draw_reason`, `active_player`, `ply`, `turn_limit_plies`, `draw_offered_by`); local/AI HUD behavior is unchanged.
+  - Fixed a handshake race found by the real client check: the server no longer pings clients before their HELLO, and the client sends HELLO before processing inbound frames.
+  - Added `test_online_client.gd` (URL/secure-page, handshake, room create/join/start/leave, reconnect/resume, invalid resume, silence, storage), `test_online_match_session.gd` (filtered state, hidden data, intent submission without local mutation, server-view application, invalid views, session end) and `online_client_check.gd`, which runs two real WebSocket clients through connect → create/join → start → filtered views → action → reconnect → leave.
+- P9-06 is complete:
+  - Added `resources/match_modes/online_pvp.tres` (`ONLINE_HUMAN`, “Play Online”), statically preloaded with the AI mode in `MatchModeRegistry`; `Play vs AI` remains the default selection. The Web export contains `online_pvp.tres`.
+  - Added `OnlineSetupPanel` and a fourth `MatchSetup` page. The online branch skips the local map/side/first pages and provides server URL entry, connect/disconnect, create room, six-character join code (normalized/validated), room code display/copy, owner/joiner presence, owner-only map selection and start, a randomized-sides notice, assignment display after `match_started`, leave/back and clear error/session notices.
+  - The lobby is inside the existing safe-area/constrained panel, uses 44dp controls and a scroll container; focus starts on the relevant control; MatchController routes Android/back through `MatchSetup`/the panel. Joiner view disables map/start and shows a waiting notice.
+  - Added `online_setup_flow_check.gd` (mode list, invalid URL/code, create/join owner/joiner, owner-only map/start, assignment, leave/back via fake transport) and `online_setup_layout_check.gd` (three portrait sizes with simulated insets + desktop; safe area, 44dp and scroll). Added `online_setup_screenshot.gd`; rendered `online_lobby.png` and `online_assigned.png` were inspected for labels, spacing and the randomized-assignment notice.
+- Verification:
+  - Unit suite: **3223 assertions / 0 failures** (101 new assertions over batch 2).
+  - Compile check: **190 scripts, 0 broken**.
+  - Online checks: **online_server_check, online_client_check, online_setup_flow_check and online_setup_layout_check all 0 failures**; the real client check covers two WebSocket clients, filtered views, an action through the gateway, auto-reconnect/resume and leave.
+  - All eight Phase 1–8 demos: 0 failures. Setup/HUD/UI/mobile/AI checks: 0 failures. Main and Map Editor boots: exit 0. Project check: 0 errors/0 warnings in 428 files; 3D scene check: 0 problems.
+  - Phase 8 AI soak: 0 failures, 25.7 s, zero fallbacks. Phase 7 rendered proxy soak: 0 failures, 200 plies, avg 59.2 FPS, 1% low 55.1 FPS, max 147.0 ms, 79.7 MB (proxy only; P7-05 remains Blocked).
+  - Web release exported (`index.wasm` 38 MB, `index.pck` 2.2 MB) and the PCK contains `online_pvp.tres`. Android debug APK rebuilt (30 MB), zipaligned, v2/v3 signature verified.
+- Scope boundaries:
+  - The lobby stops at `match_started` and shows the randomized assignment; it does not yet load the board, gate online input, animate entitled events, show online gold/game-over/rematch UI or render reconnect overlays. That is P9-07. GitHub Pages/tunnel deployment and two-browser acceptance are P9-08.
+  - No save/load, replay or takeback. `game-design.md` is unchanged. No git commits were created.
+- Next: implement P9-07 and P9-08 as batch 4, recorded in Section 19.11.
+
+### 19.11 Phase 9 batch 4 results (2026-11-17)
+
+- P9-07 is complete:
+  - Added `OnlineMatchModel`, a view-only presentation model over `ClientMatchState`: selection, legal destinations, recruitment spawn tiles, bridge targets, promotion state and pass availability are derived from the fog-limited `PlayerView`. It produces typed action intents; it never owns a `GameState` or calls `ActionResolver`.
+  - Wired `MatchController` to start the board from `match_started`, apply the assigned local side to the camera and HUD, and route move/promotion/recruit/bridge/pass/draw actions through `OnlineMatchSession`. Input is gated on the server-reported active player and locked while an action is in flight; rejected actions surface the server error. The AI loop is explicitly disabled online.
+  - HUDs now accept either presentation model. Online labels are You/Opponent (and Your turn/waiting), the gold summary is `Gold You N · Opponent ?`, mine income comes from known mines, and both HUDs keep enemy gold hidden during the match and at game over.
+  - Entitled events drive animations and logs (move/capture/ambush/recruit/bridge/pass/gold/tokens/draw/game over); hidden opponent moves produce no log. Fog-safe rules match the existing local presentation.
+  - Added online game-over controls (`Another Match`, `Leave Room`), the lobby return with owner map reselection and re-roll, the opponent-disconnected overlay with a live grace countdown, the self-reconnecting overlay, and input blocking while either overlay is visible. Web visibility/orientation pause only affects input/AI; polling continues and a dropped socket reconnects on resume.
+  - Fixed two issues found by the new checks: action ids are now scoped per player on the server and carry a random per-session prefix, so two clients cannot collide; and a closed-room `ROOM_STATE` arriving after an abort/leave no longer repopulates the client room summary.
+  - Added `test_online_match_model.gd`, `online_match_check.gd` (real server + controller: turn gating, move, recruit, hidden-log, opponent/self reconnect, draw, game over, another match, expiry abort, leave) and `online_match_screenshot.gd` with inspected desktop/mobile match screenshots.
+- P9-08 is complete:
+  - Added `.github/workflows/pages.yml`: pinned Godot 4.7.2 + Web templates, headless import/export, `.nojekyll`, Pages artifact upload/deploy, relative paths under the repository subpath, and no `builds/` commit. `web/ONLINE_RUNBOOK.md` documents the server/CLI, Cloudflare quick tunnel, HTTPS→WSS entry, room/token/limits, versions, Pages settings, manual `gh-pages` fallback and all persistence/availability limits. `web/README.md` links the runbook and reflects online support.
+  - Added `web/online_acceptance_test.js`: serves the artifact under `/repo/`, starts the headless server with a 12 s test grace, and drives two browser contexts (desktop 1280×720 + Pixel 7 emulation) through create/join/map/start, opposite sides, own-gold-only HUDs, fog-limited views, turn gating, a move through the gateway, hidden-log absence, draw, game over/another/leave, reload/reconnect and grace expiry. It captures desktop/mobile match, game-over, waiting-overlay and resumed screenshots and asserts no console errors. 0 failures.
+  - Added the query-gated Web test bridge (A-136) used by the harness. Normal client URLs do not install it.
+  - Fixed export filters to exclude `builds/`, `web/node_modules/`, `.github/` and `.git/`; the Web PCK dropped from 27 MB to **498 KB**, and the Android APK from 54 MB to **28 MB** without changing runtime content. `.nojekyll` is present in the Web artifact.
+- Verification:
+  - Unit suite: **3278 assertions / 0 failures** (55 new assertions over batch 3); compile check: **195 scripts, 0 broken**.
+  - All online checks: **online_server_check, online_client_check, online_setup_flow_check, online_setup_layout_check and online_match_check 0 failures**. The controller integration covers the complete room → match → draw → another → reconnect/expiry → leave flow.
+  - Existing single-client Web acceptance: **0 failures** on desktop 1280/1920, narrow PC, Pixel 7 and iPhone 13 emulation, including play/rotate overlays and console cleanliness. Two-browser online acceptance: **0 failures**, including no hidden gold/units, reload/reconnect and expiry.
+  - All eight demos, setup/HUD/UI/mobile/AI checks, Main and Map Editor boots: 0 failures/exit 0. Project check: 0 errors/0 warnings in 458 files; 3D scene check: 0 problems.
+  - Phase 8 AI soak: 0 failures, 25.5 s, zero fallbacks. Phase 7 rendered proxy soak: 0 failures, 200 plies, avg 59.1 FPS, 1% low 55.4 FPS, max 149.9 ms, 80.7 MB (proxy only; P7-05 remains Blocked).
+  - Web release: `index.wasm` 38 MB, `index.pck` 498 KB, `.nojekyll`, `online_pvp.tres` present. Android debug APK: 28 MB, zipaligned, v2/v3 signature verified.
+  - Inspected screenshots: `online_lobby.png`, `online_assigned.png`, `online_match_desktop.png`, `online_match_mobile.png`, plus the two-browser match/game-over/waiting/resumed captures under `builds/web/acceptance/`.
+- Scope boundaries and remaining evidence:
+  - No save/load, replay or takeback. No accounts, matchmaking, chat, spectators, rankings or public room browser. Native Android online is not implemented; the APK remains a regression build.
+  - A live GitHub Pages deployment and a real Cloudflare quick-tunnel/phone session were not performed (no push/credentials/network session); the workflow, runbook, local `/repo/` subpath and two-browser acceptance are in place. U-20/U-26 remain open, as do P7-05 and real mobile-browser performance (U-22).
+  - `game-design.md` is unchanged. No git commits were created.
+- Phase 9 is complete. Next: review Phase 9 and decide the next phase; persistence/replay remains deferred by user decision.

@@ -11,8 +11,14 @@ static func empty_state() -> GameState:
 		return null
 	var state := GameState.new(result.map)
 	clear_units(state)
+	clear_gold(state)
 	reset_knowledge(state)
 	return state
+
+
+static func clear_gold(state: GameState) -> void:
+	for player: int in [GameConfig.Player.PLAYER_1, GameConfig.Player.PLAYER_2]:
+		state.player_gold[player] = 0
 
 
 static func clear_units(state: GameState) -> void:

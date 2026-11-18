@@ -8,10 +8,29 @@ signal ai_turn_finished
 var state: GameState
 var model: PresentationModel
 var current_config: MatchConfig
+var online_client: OnlineClient = OnlineClient.new()
+var online_session: OnlineMatchSession
+var online_model: OnlineMatchModel
+var online_mode: bool = false
+
+var _online_action_pending: bool = false
+var _online_animation_lock: bool = false
+var _online_overlay_visible: bool = false
+var _online_overlay_mode: String = ""
+var _online_grace_remaining: float = 0.0
+var _online_pending_rematch: bool = false
+var _online_overlay: Control
+var _online_overlay_title: Label
+var _online_overlay_detail: Label
+var _online_overlay_leave: Button
+var _web_test_callback = null
 
 var _input_locked: bool = false
 var _mobile_mode: bool = false
 var _setup_visible: bool = false
+var _web_orientation_paused: bool = false
+var _web_visibility_paused: bool = false
+var _web_runtime_paused: bool = false
 var _ai_delay_seconds: float = 0.6
 var _ai_generation: int = 0
 var _ai_running: bool = false
@@ -35,16 +54,53 @@ func _ready() -> void:
 	_connect_hud(_desktop_hud)
 	_connect_hud(_mobile_hud)
 	_setup.start_requested.connect(_on_setup_start_requested)
+	_setup.set_online_client(online_client)
+	online_session = OnlineMatchSession.new(online_client)
+	online_session.match_started.connect(_on_online_session_started)
+	online_session.view_changed.connect(_on_online_session_view_changed)
+	online_session.match_ended.connect(_on_online_session_ended)
+	online_client.action_result.connect(_on_online_action_result)
+	online_client.event_received.connect(_on_online_event)
+	online_client.state_changed.connect(_on_online_state_changed)
+	online_client.room_updated.connect(_on_online_room_updated)
+	_build_online_overlay()
 	_touch_input.pan_requested.connect(_on_touch_pan)
 	_touch_input.pinch_requested.connect(_on_touch_pinch)
 	_touch_input.double_tap_requested.connect(_on_touch_double_tap)
 	_touch_input.long_press_requested.connect(_on_touch_long_press)
-	set_mobile_mode(OS.has_feature("mobile"))
+	set_mobile_mode(PlatformMode.use_mobile_ui())
 	show_setup()
+	var viewport := get_viewport()
+	if viewport != null and not viewport.size_changed.is_connected(
+		_on_web_viewport_size_changed
+	):
+		viewport.size_changed.connect(_on_web_viewport_size_changed)
+	if PlatformMode.is_web_runtime():
+		WebViewport.notify_ready()
+	_update_web_orientation_pause()
+	_install_web_test_bridge()
+
+
+func _process(delta: float) -> void:
+	if online_client != null:
+		online_client.poll(delta)
+	if _online_overlay_visible and _online_overlay_mode == "opponent" \
+			and _online_grace_remaining > 0.0:
+		_online_grace_remaining = maxf(0.0, _online_grace_remaining - delta)
+		_update_online_overlay_detail()
+
+
+func active_model():
+	return online_model if online_mode else model
 
 
 func _exit_tree() -> void:
 	_ai_generation += 1
+	var viewport := get_viewport()
+	if viewport != null and viewport.size_changed.is_connected(
+		_on_web_viewport_size_changed
+	):
+		viewport.size_changed.disconnect(_on_web_viewport_size_changed)
 
 
 func _connect_hud(hud: HudBase) -> void:
@@ -71,6 +127,7 @@ func load_map(map_id: String) -> bool:
 				"Map load failed: %s" % "; ".join(PackedStringArray(result.errors))
 			)
 		return false
+	_exit_online_match()
 	_cancel_ai_work()
 	_ai_brain = null
 	state = GameState.new(result.map)
@@ -99,6 +156,7 @@ func start_match(config: MatchConfig) -> bool:
 		push_error("Cannot load map %s: %s" % [config.map_id, str(result.errors)])
 		return false
 	_cancel_ai_work()
+	_exit_online_match()
 	state = GameState.new(
 		result.map,
 		GameConfig.DEFAULT_TURN_LIMIT_PLIES,
@@ -130,6 +188,8 @@ func _on_setup_start_requested(config: MatchConfig) -> void:
 
 
 func rematch() -> bool:
+	if online_mode:
+		return _request_online_rematch()
 	if current_config != null:
 		return start_match(current_config.duplicate_config())
 	if state != null:
@@ -142,10 +202,20 @@ func return_to_setup() -> void:
 
 
 func _on_rematch_requested() -> void:
+	if online_mode:
+		_request_online_rematch()
+		return
 	rematch()
 
 
 func _on_setup_requested() -> void:
+	if online_mode:
+		if online_client != null:
+			online_client.leave_room()
+		_exit_online_match()
+		show_setup()
+		_setup.go_to_online_page()
+		return
 	return_to_setup()
 
 
@@ -159,6 +229,12 @@ func show_setup(config: MatchConfig = null) -> void:
 		model.cancel_bridge_action()
 		model.cancel_promotion()
 		model.clear_selection()
+		_refresh_presentation(false)
+	if online_model != null:
+		online_model.cancel_recruitment()
+		online_model.cancel_bridge_action()
+		online_model.cancel_promotion()
+		online_model.clear_selection()
 		_refresh_presentation(false)
 	_sync_hud_visibility()
 	_setup.show_setup(current_config if config == null else config)
@@ -181,29 +257,43 @@ func _sync_hud_visibility() -> void:
 	if _mobile_hud != null:
 		_mobile_hud.visible = _mobile_mode and not _setup_visible
 	_hud = _mobile_hud if _mobile_mode else _desktop_hud
+	_set_hud_online_mode(online_mode)
 
 
 func _refresh_presentation(update_board: bool) -> void:
-	if model == null:
+	var view_model = active_model()
+	if view_model == null:
 		return
 	if update_board:
 		_board.update_from_view(
-			model.view, model.explored_mine_tiles(), model.visible_gold_token_tiles()
+			view_model.view,
+			view_model.explored_mine_tiles(),
+			view_model.visible_gold_token_tiles()
 		)
 	_board.set_highlights(
-		model.selected_tile,
-		model.legal_destinations,
-		model.capture_destinations,
-		model.bridge_build_targets,
-		model.bridge_destroy_targets,
-		model.recruitment_spawn_tiles
+		view_model.selected_tile,
+		view_model.legal_destinations,
+		view_model.capture_destinations,
+		view_model.bridge_build_targets,
+		view_model.bridge_destroy_targets,
+		view_model.recruitment_spawn_tiles
 	)
 	if _hud != null:
-		_hud.refresh(model, _input_locked)
+		_hud.refresh(
+			view_model,
+			_input_locked or _web_runtime_paused or _online_action_pending
+				or _online_animation_lock or _online_overlay_visible
+		)
 
 
 func _on_tile_clicked(tile: Vector2i) -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_animation_lock or _online_overlay_visible:
+		return
+	if online_mode:
+		_on_online_tile_clicked(tile)
+		return
+	if model == null:
 		return
 	var click := model.click_tile(tile)
 	match click:
@@ -314,14 +404,744 @@ func _last_log_entry() -> String:
 	return entries[entries.size() - 1]
 
 
+func _on_online_tile_clicked(tile: Vector2i) -> void:
+	if online_model == null:
+		return
+	if not online_model.can_interact():
+		if _hud != null:
+			_hud.set_status("Waiting for the opponent.")
+		return
+	var click := online_model.click_tile(tile)
+	match click:
+		OnlineMatchModel.ClickResult.SELECTED:
+			_refresh_presentation(false)
+			var unit := online_model.selected_unit()
+			if unit != null and _hud != null:
+				_hud.set_status(
+					"Selected %s at %s; %d destinations."
+					% [unit.definition().display_name, str(tile), online_model.legal_destinations.size()]
+				)
+		OnlineMatchModel.ClickResult.ACTION_OK:
+			var action := online_model.consume_action()
+			_submit_online_action(action)
+		OnlineMatchModel.ClickResult.PROMOTION_REQUIRED:
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Choose a promotion for the pawn.")
+		OnlineMatchModel.ClickResult.DESELECTED:
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Selection cleared.")
+		OnlineMatchModel.ClickResult.REJECTED:
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Action rejected.")
+		_:
+			pass
+
+
+func _submit_online_action(action: GameAction) -> bool:
+	if action == null or online_session == null or _online_action_pending:
+		return false
+	var result := online_session.submit_action(action)
+	if not bool(result["ok"]):
+		_online_action_pending = false
+		if _hud != null:
+			_hud.set_status("Action rejected: %s" % String(result["error"]))
+		_refresh_presentation(false)
+		return false
+	_online_action_pending = true
+	if online_model != null:
+		online_model.clear_selection()
+	_refresh_presentation(false)
+	if _hud != null:
+		_hud.set_status("Action sent; waiting for the server.")
+	return true
+
+
+func _on_online_action_result(result: Dictionary) -> void:
+	if not online_mode:
+		return
+	if bool(result.get("accepted", false)):
+		if bool(result.get("game_over", false)):
+			_online_action_pending = false
+			_refresh_presentation(false)
+		return
+	_online_action_pending = false
+	var message := String(result.get("error", "The server rejected the action."))
+	if _hud != null:
+		_hud.set_status("Action rejected: %s" % message)
+	_refresh_presentation(false)
+
+
+func _on_online_session_started(state_model: ClientMatchState) -> void:
+	if state_model == null:
+		return
+	if online_mode and online_model != null and online_model.state != null \
+			and online_model.state.map_id == state_model.map_id:
+		_apply_online_state(state_model)
+		return
+	_begin_online_match(state_model)
+
+
+func _begin_online_match(state_model: ClientMatchState) -> void:
+	_cancel_ai_work()
+	_ai_brain = null
+	state = null
+	model = null
+	current_config = null
+	online_mode = true
+	online_model = OnlineMatchModel.new(state_model)
+	_online_action_pending = false
+	_online_animation_lock = false
+	_online_pending_rematch = false
+	_hide_online_overlay()
+	_set_hud_online_mode(true)
+	_board.build(online_model.view.board)
+	if _camera_rig != null:
+		_camera_rig.set_side_orientation(online_model.local_player)
+		_camera_rig.set_mobile_board_bounds(_board.get_world_bounds())
+		_camera_rig.reset_view()
+	_input_locked = false
+	hide_setup()
+	_refresh_presentation(true)
+	if _hud != null:
+		_hud.set_status(
+			"Online match — you are Player %d. %s"
+			% [
+				online_model.local_player,
+				"Your turn." if online_model.can_interact() else "Opponent moves first.",
+			]
+		)
+
+
+func _on_online_session_view_changed(state_model: ClientMatchState) -> void:
+	if not online_mode or state_model == null:
+		return
+	_apply_online_state(state_model)
+
+
+func _apply_online_state(state_model: ClientMatchState) -> void:
+	if online_model == null:
+		online_model = OnlineMatchModel.new(state_model)
+	else:
+		online_model.state = state_model
+		online_model.refresh()
+	_online_action_pending = false
+	_online_animation_lock = false
+	if _online_overlay_mode == "self":
+		_hide_online_overlay("self")
+	_refresh_presentation(true)
+	_update_online_status()
+
+
+func _on_online_session_ended(_reason: String) -> void:
+	if not online_mode:
+		return
+	_exit_online_match()
+	show_setup()
+	_setup.go_to_online_page()
+
+
+func _on_online_state_changed(state: int) -> void:
+	if not online_mode:
+		return
+	match state:
+		OnlineClient.State.RECONNECTING:
+			_show_online_overlay("self", "Reconnecting", "Connection lost. Retrying...")
+		OnlineClient.State.IN_MATCH:
+			if _online_overlay_mode == "self":
+				_hide_online_overlay("self")
+		OnlineClient.State.FAILED:
+			_hide_online_overlay()
+			_exit_online_match()
+			show_setup()
+			_setup.go_to_online_page()
+
+
+func _on_online_room_updated(room: Dictionary) -> void:
+	if not online_mode or room.is_empty():
+		return
+	var paused := bool(room.get("paused", false))
+	if paused:
+		var grace := float(room.get("grace_remaining", 0.0))
+		if grace > 0.0:
+			_online_grace_remaining = grace
+		_show_online_overlay(
+			"opponent",
+			"Opponent disconnected",
+			_waiting_detail(grace)
+		)
+	elif _online_overlay_mode == "opponent":
+		_hide_online_overlay("opponent")
+		if _hud != null:
+			_hud.set_status("Opponent reconnected.")
+
+
+func _on_online_event(event: Dictionary) -> void:
+	if not online_mode or online_model == null:
+		return
+	var event_type := String(event.get("type", ""))
+	match event_type:
+		"opponent_disconnected":
+			_online_grace_remaining = float(event.get("grace_seconds", OnlineServer.DEFAULT_GRACE_SECONDS))
+			_show_online_overlay(
+				"opponent",
+				"Opponent disconnected",
+				_waiting_detail(_online_grace_remaining)
+			)
+			return
+		"opponent_resumed":
+			_hide_online_overlay("opponent")
+			if _hud != null:
+				_hud.set_status("Opponent reconnected.")
+			return
+		"returned_to_lobby":
+			_return_to_online_lobby()
+			return
+		"room_closed", "match_aborted":
+			return
+
+	var messages: Array[String] = []
+	var tween: Tween = null
+	match event_type:
+		"move":
+			var unit_id := int(event.get("unit_id", -1))
+			var unit := online_model.view.known_units.get(unit_id) as GameUnit
+			var final_tile := _event_tile(event.get("final_tile", []))
+			var from_tile := _event_tile(event.get("from", []))
+			if unit != null:
+				var owner_text := "Your" if unit.owner == online_model.local_player else "Opponent's"
+				var unit_name := unit.definition().display_name
+				if bool(event.get("partial", false)):
+					messages.append("%s %s stopped at %s." % [owner_text, unit_name, str(final_tile)])
+				else:
+					messages.append("%s %s moved to %s." % [owner_text, unit_name, str(final_tile)])
+				if int(event.get("promoted_to", -1)) != -1:
+					messages.append("%s %s promoted." % [owner_text, unit_name])
+				if from_tile.x >= 0 and final_tile.x >= 0:
+					tween = _board.animate_move(unit_id, from_tile, final_tile)
+			else:
+				messages.append("A unit moved.")
+		"capture":
+			var tile := _event_tile(event.get("tile", []))
+			var owner := int(event.get("owner", GameConfig.NO_PLAYER))
+			var type := int(event.get("unit_type", -1))
+			var unit_name := _unit_type_name(type)
+			if owner == online_model.local_player:
+				messages.append("Your %s was captured at %s." % [unit_name, str(tile)])
+			else:
+				messages.append("You captured the opponent's %s at %s." % [unit_name, str(tile)])
+			_board.spawn_effect(tile, Color(1.0, 0.25, 0.2, 0.85))
+		"ambush":
+			var tile := _event_tile(event.get("ambusher_tile", []))
+			var owner := int(event.get("owner", GameConfig.NO_PLAYER))
+			var ambusher_name := _unit_type_name(int(event.get("ambusher_type", -1)))
+			if owner == online_model.local_player:
+				messages.append("Your %s ambushed an enemy at %s." % [ambusher_name, str(tile)])
+			else:
+				messages.append("Ambushed by %s at %s." % [ambusher_name, str(tile)])
+			_board.spawn_effect(tile, Color(1.0, 0.65, 0.15, 0.9))
+		"recruit":
+			var tile := _event_tile(event.get("tile", []))
+			var unit_name := _unit_type_name(int(event.get("unit_type", -1)))
+			messages.append("You recruited %s at %s." % [unit_name, str(tile)])
+			_board.pulse_piece(int(event.get("unit_id", -1)))
+		"bridge":
+			var tile := _event_tile(event.get("tile", []))
+			var mode := String(event.get("mode", ""))
+			messages.append(
+				"A bridge was %s at %s."
+				% ["built" if mode == "build" else "destroyed", str(tile)]
+			)
+		"gold":
+			messages.append("You gained %d gold." % int(event.get("amount", 0)))
+		"token_spawned":
+			messages.append("A gold token appeared at %s." % str(_event_tile(event.get("tile", []))))
+		"token_collected":
+			messages.append("A gold token was collected at %s." % str(_event_tile(event.get("tile", []))))
+		"draw_offered":
+			var player := int(event.get("player", GameConfig.NO_PLAYER))
+			messages.append(
+				"You offered a draw."
+				if player == online_model.local_player
+				else "Opponent offered a draw."
+			)
+		"draw_accepted":
+			messages.append("Draw agreed.")
+		"draw_declined":
+			messages.append("Draw declined.")
+		"game_over":
+			messages.append(_online_game_over_text(event))
+			_hide_online_overlay()
+		"rematch_requested":
+			var player := int(event.get("player", GameConfig.NO_PLAYER))
+			messages.append(
+				"You requested another match."
+				if player == online_model.local_player
+				else "Opponent requested another match."
+			)
+	for message: String in messages:
+		online_model.append_public_log(message)
+	if tween != null:
+		_online_animation_lock = true
+		_refresh_presentation(false)
+		await tween.finished
+		_online_animation_lock = false
+	_refresh_presentation(false)
+	if not messages.is_empty() and _hud != null:
+		_hud.set_status(messages[messages.size() - 1])
+
+
+func _update_online_status() -> void:
+	if online_model == null or _hud == null:
+		return
+	if online_model.is_game_over():
+		_hud.set_status("Match over.")
+	elif online_model.can_interact():
+		_hud.set_status("Your turn.")
+	else:
+		_hud.set_status("Waiting for the opponent.")
+
+
+func _request_online_rematch() -> bool:
+	if not online_mode or online_session == null:
+		return false
+	if not online_session.request_rematch():
+		if _hud != null:
+			_hud.set_status("Another match is unavailable.")
+		return false
+	_online_pending_rematch = true
+	if _hud != null:
+		_hud.set_status("Another match requested; waiting for the opponent.")
+	return true
+
+
+func _return_to_online_lobby() -> void:
+	_exit_online_match()
+	show_setup()
+	_setup.go_to_online_page()
+
+
+func _exit_online_match() -> void:
+	if not online_mode and online_model == null:
+		return
+	online_mode = false
+	online_model = null
+	_online_action_pending = false
+	_online_animation_lock = false
+	_online_pending_rematch = false
+	_hide_online_overlay()
+	_set_hud_online_mode(false)
+	state = null
+	model = null
+	current_config = null
+	_sync_hud_visibility()
+
+
+func _online_game_over_text(event: Dictionary) -> String:
+	if online_model == null:
+		return "Match over."
+	var draw_reason := String(event.get("draw_reason", ""))
+	if not draw_reason.is_empty():
+		return "Draw: %s." % draw_reason
+	var winner := int(event.get("winner", GameConfig.NO_PLAYER))
+	if winner == GameConfig.NO_PLAYER:
+		return "Match over."
+	return "You win by King capture." if winner == online_model.local_player \
+		else "Opponent wins by King capture."
+
+
+func _unit_type_name(unit_type: int) -> String:
+	if unit_type in UnitRegistry.get_all_types():
+		return UnitRegistry.get_definition(unit_type).display_name
+	return "unit"
+
+
+func _event_tile(value: Variant) -> Vector2i:
+	if typeof(value) != TYPE_ARRAY:
+		return BoardView.NO_TILE
+	var entries: Array = value
+	if entries.size() != 2:
+		return BoardView.NO_TILE
+	var x := int(entries[0])
+	var y := int(entries[1])
+	if x < 0 or y < 0:
+		return BoardView.NO_TILE
+	return Vector2i(x, y)
+
+
+func _waiting_detail(grace: float) -> String:
+	if grace <= 0.0:
+		return "Grace period expired. Closing the room..."
+	return "Waiting %ds for the opponent to reconnect." % ceili(grace)
+
+
+func _build_online_overlay() -> void:
+	if _online_overlay != null:
+		return
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	_online_overlay = Control.new()
+	_online_overlay.name = "OnlineConnectionOverlay"
+	_online_overlay.visible = false
+	_online_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_online_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui.add_child(_online_overlay)
+	var backdrop := ColorRect.new()
+	backdrop.color = Color(0.02, 0.03, 0.05, 0.82)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_online_overlay.add_child(backdrop)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_online_overlay.add_child(center)
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.055, 0.075, 0.105, 1.0)
+	style.border_color = Color(0.18, 0.28, 0.4, 1.0)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(14)
+	panel.add_theme_stylebox_override("panel", style)
+	center.add_child(panel)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", roundi(MobileMetrics.dp_to_ui(20.0)))
+	margin.add_theme_constant_override("margin_top", roundi(MobileMetrics.dp_to_ui(20.0)))
+	margin.add_theme_constant_override("margin_right", roundi(MobileMetrics.dp_to_ui(20.0)))
+	margin.add_theme_constant_override("margin_bottom", roundi(MobileMetrics.dp_to_ui(20.0)))
+	panel.add_child(margin)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", roundi(MobileMetrics.dp_to_ui(10.0)))
+	margin.add_child(column)
+	_online_overlay_title = Label.new()
+	_online_overlay_title.name = "OnlineConnectionTitle"
+	_online_overlay_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_online_overlay_title.add_theme_font_size_override(
+		"font_size", roundi(MobileMetrics.dp_to_ui(20.0))
+	)
+	column.add_child(_online_overlay_title)
+	_online_overlay_detail = Label.new()
+	_online_overlay_detail.name = "OnlineConnectionDetail"
+	_online_overlay_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_online_overlay_detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_online_overlay_detail.custom_minimum_size.x = MobileMetrics.dp_to_ui(280.0)
+	_online_overlay_detail.add_theme_font_size_override(
+		"font_size", roundi(MobileMetrics.dp_to_ui(14.0))
+	)
+	column.add_child(_online_overlay_detail)
+	_online_overlay_leave = Button.new()
+	_online_overlay_leave.name = "OnlineConnectionLeave"
+	_online_overlay_leave.text = "Leave Room"
+	_online_overlay_leave.custom_minimum_size = Vector2(
+		MobileMetrics.dp_to_ui(MobileMetrics.TOUCH_TARGET_DP),
+		MobileMetrics.dp_to_ui(MobileMetrics.TOUCH_TARGET_DP)
+	)
+	_online_overlay_leave.pressed.connect(_on_online_overlay_leave)
+	column.add_child(_online_overlay_leave)
+
+
+func _show_online_overlay(mode: String, title: String, detail: String) -> void:
+	if _online_overlay == null:
+		_build_online_overlay()
+	if _online_overlay == null:
+		return
+	_online_overlay_mode = mode
+	_online_overlay_title.text = title
+	_online_overlay_detail.text = detail
+	_online_overlay.visible = true
+	_online_overlay_visible = true
+	_refresh_presentation(false)
+
+
+func _hide_online_overlay(mode: String = "") -> void:
+	if _online_overlay == null:
+		return
+	if not mode.is_empty() and _online_overlay_mode != mode:
+		return
+	_online_overlay.visible = false
+	_online_overlay_visible = false
+	_online_overlay_mode = ""
+	_refresh_presentation(false)
+
+
+func _update_online_overlay_detail() -> void:
+	if _online_overlay_detail == null or _online_overlay_mode != "opponent":
+		return
+	_online_overlay_detail.text = _waiting_detail(_online_grace_remaining)
+
+
+func _on_online_overlay_leave() -> void:
+	if online_client != null:
+		online_client.leave_room()
+	_exit_online_match()
+	show_setup()
+	_setup.go_to_online_page()
+
+
+func _install_web_test_bridge() -> void:
+	if not OS.has_feature("web"):
+		return
+	var bridge := Engine.get_singleton("JavaScriptBridge")
+	if bridge == null:
+		return
+	var search := String(bridge.call("eval", "window.location.search", true))
+	if not search.contains("online_test=1"):
+		return
+	var window = bridge.call("get_interface", "window")
+	if window == null:
+		return
+	var callback = bridge.call("create_callback", Callable(self, "_on_web_test_command"))
+	_web_test_callback = callback
+	window.chessfrontGodotCallback = callback
+	bridge.call(
+		"eval",
+		"window.chessfrontOnlineCommand = function(cmd, arg) {"
+		+ " window.chessfrontOnlineResult = null;"
+		+ " window.chessfrontGodotCallback(cmd, arg === undefined ? '' : String(arg));"
+		+ " return window.chessfrontOnlineResult; };",
+		true
+	)
+
+
+func _on_web_test_command(args: Array) -> String:
+	var command := String(args[0]) if args.size() > 0 else ""
+	var argument := String(args[1]) if args.size() > 1 else ""
+	var text := JSON.stringify(_run_web_test_command(command, argument))
+	var bridge := Engine.get_singleton("JavaScriptBridge")
+	if bridge != null:
+		bridge.call(
+			"eval",
+			"window.chessfrontOnlineResult = %s;" % JSON.stringify(text),
+			true
+		)
+	return ""
+
+
+func _run_web_test_command(command: String, argument: String) -> Dictionary:
+	match command:
+		"state":
+			return {"ok": true, "state": web_online_state()}
+		"openOnline":
+			if not _setup.visible:
+				show_setup()
+			var mode_button := _setup.find_child("ModeOption_online_pvp", true, false) as Button
+			if mode_button == null:
+				return {"ok": false, "error": "Play Online mode button is missing"}
+			mode_button.pressed.emit()
+			var primary := _setup.find_child("SetupPrimaryButton", true, false) as Button
+			if primary == null:
+				return {"ok": false, "error": "Setup primary button is missing"}
+			primary.pressed.emit()
+			return {"ok": true}
+		"connect":
+			return online_client.connect_to_url(argument)
+		"disconnect":
+			online_client.disconnect_from_server()
+			return {"ok": true}
+		"create":
+			return _client_result(online_client.create_room())
+		"join":
+			return _client_result(online_client.join_room(argument))
+		"selectMap":
+			return _client_result(online_client.select_map(argument))
+		"start":
+			return _client_result(online_client.start_match())
+		"leave":
+			_on_setup_requested()
+			return {"ok": true}
+		"rematch":
+			_on_rematch_requested()
+			return {"ok": true}
+		"offerDraw":
+			_on_offer_draw_requested()
+			return {"ok": true}
+		"acceptDraw":
+			_on_accept_draw_requested()
+			return {"ok": true}
+		"declineDraw":
+			_on_decline_draw_requested()
+			return {"ok": true}
+		"pass":
+			if online_model == null or not online_model.pass_available():
+				return {"ok": false, "error": "Pass is unavailable"}
+			_on_pass_requested()
+			return {"ok": true}
+		"moveFirst":
+			return _web_test_move_first()
+		"recruitPawn":
+			return _web_test_recruit_pawn()
+		"promoteQueen":
+			if online_model == null or not online_model.has_pending_promotion():
+				return {"ok": false, "error": "No promotion is pending"}
+			_on_promotion_selected(UnitType.Type.QUEEN)
+			return {"ok": true}
+		"bridgeBuild":
+			return _web_test_bridge(true)
+		"bridgeDestroy":
+			return _web_test_bridge(false)
+		"click":
+			var parts := argument.split(",")
+			if parts.size() != 2:
+				return {"ok": false, "error": "Click expects x,y"}
+			_on_tile_clicked(Vector2i(int(parts[0]), int(parts[1])))
+			return {"ok": true}
+		"clearLog":
+			if online_model != null:
+				online_model.action_log.clear()
+			return {"ok": true}
+	return {"ok": false, "error": "Unknown online test command %s" % command}
+
+
+func web_online_state() -> Dictionary:
+	var result := {
+		"online_mode": online_mode,
+		"setup_visible": is_setup_visible(),
+		"setup_page": int(_setup.current_page()) if _setup != null else -1,
+		"client_state": online_client.state_name(),
+		"client_error": online_client.last_error,
+		"code": online_client.code,
+		"room": online_client.room.duplicate(true),
+		"assignment": online_client.assignment.duplicate(true),
+		"overlay": {
+			"visible": _online_overlay_visible,
+			"mode": _online_overlay_mode,
+			"title": _online_overlay_title.text if _online_overlay_title != null else "",
+			"detail": _online_overlay_detail.text if _online_overlay_detail != null else "",
+		},
+		"ai_running": is_ai_turn_running(),
+		"ai_thinking": is_ai_thinking(),
+		"hud": {},
+		"available": {},
+	}
+	if online_model != null:
+		result["ply"] = online_model.ply()
+		result["local_player"] = online_model.local_player
+		result["active_player"] = online_model.active_player()
+		result["own_gold"] = online_model.own_gold()
+		result["gold_summary"] = online_model.gold_summary()
+		result["can_act"] = online_model.can_interact()
+		result["known_units"] = online_model.view.get_known_units().size()
+		var enemies := 0
+		for unit: GameUnit in online_model.view.get_known_units():
+			if unit.owner != online_model.local_player:
+				enemies += 1
+		result["known_enemies"] = enemies
+		result["logs"] = online_model.log_entries()
+		result["game_over"] = online_model.is_game_over()
+		result["winner"] = online_model.game_winner()
+		result["draw_reason"] = online_model.game_draw_reason()
+		result["draw_offered_by"] = online_model.draw_offered_by()
+		result["incoming_draw_offer"] = online_model.incoming_draw_offer()
+		result["draw_offer_local"] = online_model.draw_offered_by_local()
+		result["available"] = {
+			"pass": online_model.pass_available(),
+			"recruit_pawn": online_model.can_recruit_unit(UnitType.Type.PAWN),
+			"promotion": online_model.has_pending_promotion(),
+		}
+	for hud_name: String in ["HUD", "MobileHUD"]:
+		var hud := get_node_or_null("UI/%s" % hud_name) as Control
+		if hud == null:
+			continue
+		var gold := hud.find_child("GoldLabel", true, false) as Label
+		var turn := hud.find_child("TurnLabel", true, false) as Label
+		var rematch := hud.find_child("GameOverRematchButton", true, false) as Button
+		var leave := hud.find_child("GameOverSetupButton", true, false) as Button
+		result["hud"][hud_name] = {
+			"visible": hud.visible,
+			"gold": gold.text if gold != null else "",
+			"turn": turn.text if turn != null else "",
+			"rematch": rematch.text if rematch != null else "",
+			"leave": leave.text if leave != null else "",
+		}
+	return result
+
+
+func _web_test_move_first() -> Dictionary:
+	if online_model == null or not online_model.can_interact():
+		return {"ok": false, "error": "Not your turn"}
+	var view := online_model.view
+	for unit: GameUnit in view.get_units_for_player(online_model.local_player):
+		var destinations := MovementRules.legal_destinations(view, unit, view.exploration)
+		if destinations.is_empty():
+			continue
+		_on_tile_clicked(unit.tile)
+		_on_tile_clicked(destinations[0])
+		return {"ok": true, "from": [unit.tile.x, unit.tile.y], "to": [destinations[0].x, destinations[0].y]}
+	return {"ok": false, "error": "No legal move"}
+
+
+func _web_test_recruit_pawn() -> Dictionary:
+	if online_model == null or not online_model.begin_recruitment(UnitType.Type.PAWN):
+		return {"ok": false, "error": "Recruitment is unavailable"}
+	var spawns := online_model.recruitment_spawn_tiles
+	if spawns.is_empty():
+		return {"ok": false, "error": "No spawn tile"}
+	_on_tile_clicked(spawns[0])
+	return {"ok": true, "tile": [spawns[0].x, spawns[0].y]}
+
+
+func _web_test_bridge(build: bool) -> Dictionary:
+	if online_model == null:
+		return {"ok": false, "error": "No online match"}
+	var started := online_model.begin_bridge_build() if build else online_model.begin_bridge_destroy()
+	if not started:
+		return {"ok": false, "error": "No bridge action"}
+	var targets := online_model.bridge_build_targets if build else online_model.bridge_destroy_targets
+	if targets.is_empty():
+		return {"ok": false, "error": "No bridge target"}
+	_on_tile_clicked(targets[0])
+	return {"ok": true, "tile": [targets[0].x, targets[0].y]}
+
+
+func _client_result(ok: bool) -> Dictionary:
+	return {
+		"ok": ok,
+		"error": online_client.last_error if not ok else "",
+	}
+
+
+func _set_hud_online_mode(enabled: bool) -> void:
+	if _desktop_hud != null:
+		_desktop_hud.set_online_mode(enabled)
+	if _mobile_hud != null:
+		_mobile_hud.set_online_mode(enabled)
+
+
 func _on_pass_requested() -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_model == null:
+			return
+		var action := online_model.pass_action()
+		if action == null:
+			if _hud != null:
+				_hud.set_status("Pass is unavailable while a legal action exists.")
+			return
+		_submit_online_action(action)
+		return
+	if model == null:
 		return
 	_handle_action_result(model.pass_turn())
 
 
 func _on_recruit_requested(unit_type: int) -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_model != null and online_model.begin_recruitment(unit_type):
+			if _mobile_hud != null:
+				_mobile_hud.close_recruit_sheet()
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Recruit mode: select a highlighted spawn tile.")
+		elif _hud != null:
+			_hud.set_status("Recruitment is unavailable.")
+		return
+	if model == null:
 		return
 	if model.begin_recruitment(unit_type):
 		if _mobile_hud != null:
@@ -335,7 +1155,18 @@ func _on_recruit_requested(unit_type: int) -> void:
 
 
 func _on_bridge_build_requested() -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_model != null and online_model.begin_bridge_build():
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Build mode: select a highlighted water tile.")
+		elif _hud != null:
+			_hud.set_status("No bridge can be built by the selected unit.")
+		return
+	if model == null:
 		return
 	if model.begin_bridge_build():
 		_refresh_presentation(false)
@@ -347,7 +1178,18 @@ func _on_bridge_build_requested() -> void:
 
 
 func _on_bridge_destroy_requested() -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_model != null and online_model.begin_bridge_destroy():
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Destroy mode: select a highlighted bridge tile.")
+		elif _hud != null:
+			_hud.set_status("No bridge can be destroyed by the selected unit.")
+		return
+	if model == null:
 		return
 	if model.begin_bridge_destroy():
 		_refresh_presentation(false)
@@ -359,7 +1201,19 @@ func _on_bridge_destroy_requested() -> void:
 
 
 func _on_cancel_requested() -> void:
-	if _setup_visible or model == null:
+	if _setup_visible or _web_runtime_paused:
+		return
+	if online_mode:
+		if online_model != null:
+			online_model.cancel_recruitment()
+			online_model.cancel_bridge_action()
+			online_model.cancel_promotion()
+			online_model.clear_selection()
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Mode cancelled.")
+		return
+	if model == null:
 		return
 	model.cancel_recruitment()
 	model.cancel_bridge_action()
@@ -370,13 +1224,35 @@ func _on_cancel_requested() -> void:
 
 
 func _on_promotion_selected(unit_type: int) -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_model == null:
+			return
+		var action := online_model.complete_promotion_action(unit_type)
+		if action == null:
+			if _hud != null:
+				_hud.set_status("Invalid promotion choice.")
+			return
+		_submit_online_action(action)
+		return
+	if model == null:
 		return
 	_handle_action_result(model.complete_promotion(unit_type))
 
 
 func _on_promotion_cancelled() -> void:
-	if _setup_visible or model == null:
+	if _setup_visible or _web_runtime_paused:
+		return
+	if online_mode:
+		if online_model != null:
+			online_model.cancel_promotion()
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Promotion cancelled.")
+		return
+	if model == null:
 		return
 	model.cancel_promotion()
 	_refresh_presentation(false)
@@ -385,7 +1261,17 @@ func _on_promotion_cancelled() -> void:
 
 
 func _on_offer_draw_requested() -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_model != null and online_model.can_offer_draw() and online_session.offer_draw():
+			if _hud != null:
+				_hud.set_status("Draw offered.")
+		elif _hud != null:
+			_hud.set_status("Draw offer is unavailable.")
+		return
+	if model == null:
 		return
 	if model.offer_draw():
 		_refresh_presentation(false)
@@ -398,7 +1284,17 @@ func _on_offer_draw_requested() -> void:
 
 
 func _on_accept_draw_requested() -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_session.accept_draw():
+			if _hud != null:
+				_hud.set_status("Draw accepted.")
+		elif _hud != null:
+			_hud.set_status("No opponent draw offer is pending.")
+		return
+	if model == null:
 		return
 	if model.accept_draw():
 		_refresh_presentation(false)
@@ -410,7 +1306,17 @@ func _on_accept_draw_requested() -> void:
 
 
 func _on_decline_draw_requested() -> void:
-	if _setup_visible or _input_locked or model == null:
+	if _setup_visible or _input_locked or _web_runtime_paused \
+			or _online_action_pending or _online_overlay_visible:
+		return
+	if online_mode:
+		if online_session.decline_draw():
+			if _hud != null:
+				_hud.set_status("Draw declined.")
+		elif _hud != null:
+			_hud.set_status("No opponent draw offer is pending.")
+		return
+	if model == null:
 		return
 	if model.decline_draw():
 		_refresh_presentation(false)
@@ -439,9 +1345,70 @@ func is_ai_turn_running() -> bool:
 	return _ai_running
 
 
+func is_web_runtime_paused() -> bool:
+	return _web_runtime_paused
+
+
+func _on_web_viewport_size_changed() -> void:
+	_update_web_orientation_pause()
+
+
+func _update_web_orientation_pause() -> void:
+	if not PlatformMode.is_web_runtime():
+		return
+	_set_web_orientation_paused(
+		WebViewport.resolve_orientation_pause(
+			true,
+			PlatformMode.use_mobile_ui(),
+			WebViewport.is_landscape()
+		)
+	)
+
+
+func _set_web_orientation_paused(value: bool) -> void:
+	if _web_orientation_paused == value:
+		return
+	_web_orientation_paused = value
+	_apply_web_pause_state()
+
+
+func _set_web_visibility_paused(value: bool) -> void:
+	if _web_visibility_paused == value:
+		return
+	_web_visibility_paused = value
+	_apply_web_pause_state()
+
+
+func _apply_web_pause_state() -> void:
+	var should_pause := _web_orientation_paused or _web_visibility_paused
+	if should_pause == _web_runtime_paused:
+		return
+	_web_runtime_paused = should_pause
+	if should_pause:
+		_cancel_ai_work()
+		if _touch_input != null:
+			_touch_input.cancel_gesture()
+		if _hud != null:
+			_hud.set_status("Paused.")
+	else:
+		if _hud != null:
+			_hud.set_status("Resumed.")
+		_maybe_start_ai_turn()
+		if (
+			_is_ai_mode()
+			and state != null
+			and model != null
+			and not state.game_over
+			and state.draw_offered_by == model.local_player
+		):
+			_schedule_ai_draw_response()
+	_refresh_presentation(false)
+
+
 func _is_ai_mode() -> bool:
 	return (
-		model != null
+		not online_mode
+		and model != null
 		and model.ai_player != GameConfig.NO_PLAYER
 		and _ai_brain != null
 	)
@@ -456,7 +1423,15 @@ func _cancel_ai_work() -> void:
 
 
 func _maybe_start_ai_turn() -> void:
-	if _ai_running or _setup_visible or state == null or model == null or state.game_over:
+	if (
+		online_mode
+		or _ai_running
+		or _setup_visible
+		or _web_runtime_paused
+		or state == null
+		or model == null
+		or state.game_over
+	):
 		return
 	if not _is_ai_mode() or state.active_player != model.ai_player:
 		return
@@ -468,6 +1443,7 @@ func _is_current_ai_turn(generation: int) -> bool:
 	return (
 		generation == _ai_generation
 		and not _setup_visible
+		and not _web_runtime_paused
 		and state != null
 		and model != null
 		and not state.game_over
@@ -479,6 +1455,7 @@ func _is_ai_generation_current(generation: int) -> bool:
 	return (
 		generation == _ai_generation
 		and not _setup_visible
+		and not _web_runtime_paused
 		and state != null
 		and model != null
 	)
@@ -746,7 +1723,7 @@ func _append_unique(messages: Array[String], message: String) -> void:
 
 
 func _schedule_ai_draw_response() -> void:
-	if not _is_ai_mode() or _setup_visible:
+	if not _is_ai_mode() or _setup_visible or _web_runtime_paused:
 		return
 	_execute_ai_draw_response(_ai_generation)
 
@@ -756,7 +1733,7 @@ func _execute_ai_draw_response(generation: int) -> void:
 		await get_tree().create_timer(_ai_delay_seconds).timeout
 	else:
 		await get_tree().process_frame
-	if generation != _ai_generation or _setup_visible:
+	if generation != _ai_generation or _setup_visible or _web_runtime_paused:
 		return
 	if state == null or model == null or state.game_over:
 		return
@@ -809,7 +1786,7 @@ func set_mobile_mode(enabled: bool) -> void:
 	if viewport != null:
 		viewport.scaling_3d_scale = 0.85 if enabled else 1.0
 	Engine.max_fps = 60 if enabled else 0
-	if model != null:
+	if active_model() != null:
 		_refresh_presentation(false)
 		if _hud != null and enabled:
 			_hud.set_status("Mobile controls ready.")
@@ -820,6 +1797,7 @@ func _on_touch_pan(delta: Vector2) -> void:
 		_mobile_mode
 		and not _setup_visible
 		and not _input_locked
+		and not _web_runtime_paused
 		and _camera_rig != null
 	):
 		_camera_rig.mobile_pan_by(delta)
@@ -830,6 +1808,7 @@ func _on_touch_pinch(factor: float) -> void:
 		_mobile_mode
 		and not _setup_visible
 		and not _input_locked
+		and not _web_runtime_paused
 		and _camera_rig != null
 	):
 		_camera_rig.mobile_pinch(factor)
@@ -840,6 +1819,7 @@ func _on_touch_double_tap(position: Vector2) -> void:
 		not _mobile_mode
 		or _setup_visible
 		or _input_locked
+		or _web_runtime_paused
 		or _board == null
 		or _camera_rig == null
 	):
@@ -851,26 +1831,30 @@ func _on_touch_double_tap(position: Vector2) -> void:
 
 
 func _handle_touch_tap(position: Vector2) -> bool:
+	var view_model = active_model()
 	if (
 		not _mobile_mode
 		or _setup_visible
 		or _input_locked
-		or model == null
+		or _web_runtime_paused
+		or _online_action_pending
+		or _online_overlay_visible
+		or view_model == null
 		or _board == null
 	):
 		return false
-	if not model.can_interact():
+	if not view_model.can_interact():
 		return false
 	var mode_active := (
-		model.recruitment_type() != -1
-		or model.bridge_mode() != PresentationModel.BridgeMode.NONE
+		view_model.recruitment_type() != -1
+		or view_model.bridge_mode() != PresentationModel.BridgeMode.NONE
 	)
 	var action_tile := _resolve_touch_tile(position, _touch_action_tiles())
 	if action_tile != BoardView.NO_TILE:
 		_on_tile_clicked(action_tile)
 		return true
 	if mode_active:
-		model.clear_selection()
+		view_model.clear_selection()
 		_refresh_presentation(false)
 		if _hud != null:
 			_hud.set_status("Selection cleared.")
@@ -879,8 +1863,8 @@ func _handle_touch_tap(position: Vector2) -> bool:
 	if unit_tile != BoardView.NO_TILE:
 		_on_tile_clicked(unit_tile)
 		return true
-	if model.selected_tile != PresentationModel.NO_TILE:
-		model.clear_selection()
+	if view_model.selected_tile != PresentationModel.NO_TILE:
+		view_model.clear_selection()
 		_refresh_presentation(false)
 		if _hud != null:
 			_hud.set_status("Selection cleared.")
@@ -903,17 +1887,18 @@ func _resolve_touch_tile(
 
 func _touch_action_tiles() -> Array[Vector2i]:
 	var tiles: Array[Vector2i] = []
-	if model == null:
+	var view_model = active_model()
+	if view_model == null:
 		return tiles
-	if model.recruitment_type() != -1:
-		tiles.append_array(model.recruitment_spawn_tiles)
-	elif model.bridge_mode() == PresentationModel.BridgeMode.BUILD:
-		tiles.append_array(model.bridge_build_targets)
-	elif model.bridge_mode() == PresentationModel.BridgeMode.DESTROY:
-		tiles.append_array(model.bridge_destroy_targets)
-	elif model.selected_unit() != null:
-		tiles.append_array(model.legal_destinations)
-		for tile: Vector2i in model.capture_destinations:
+	if view_model.recruitment_type() != -1:
+		tiles.append_array(view_model.recruitment_spawn_tiles)
+	elif view_model.bridge_mode() == PresentationModel.BridgeMode.BUILD:
+		tiles.append_array(view_model.bridge_build_targets)
+	elif view_model.bridge_mode() == PresentationModel.BridgeMode.DESTROY:
+		tiles.append_array(view_model.bridge_destroy_targets)
+	elif view_model.selected_unit() != null:
+		tiles.append_array(view_model.legal_destinations)
+		for tile: Vector2i in view_model.capture_destinations:
 			if tile not in tiles:
 				tiles.append(tile)
 	return tiles
@@ -921,19 +1906,23 @@ func _touch_action_tiles() -> Array[Vector2i]:
 
 func _touch_own_unit_tiles() -> Array[Vector2i]:
 	var tiles: Array[Vector2i] = []
-	if model == null or not model.can_interact():
+	var view_model = active_model()
+	if view_model == null or not view_model.can_interact():
 		return tiles
-	for unit: GameUnit in model.view.get_units_for_player(model.local_player):
+	for unit: GameUnit in view_model.view.get_units_for_player(view_model.local_player):
 		tiles.append(unit.tile)
 	return tiles
 
 
 func _on_touch_long_press(position: Vector2) -> void:
+	var view_model = active_model()
 	if (
 		not _mobile_mode
 		or _setup_visible
 		or _input_locked
-		or model == null
+		or _web_runtime_paused
+		or _online_overlay_visible
+		or view_model == null
 		or _board == null
 	):
 		return
@@ -963,31 +1952,73 @@ func _build_tile_info(tile: Vector2i) -> Dictionary:
 		"token": false,
 		"unit": {},
 	}
-	if model == null or model.view == null:
+	var view_model = active_model()
+	if view_model == null or view_model.view == null:
 		return info
-	var explored := model.view.knowledge.is_explored(tile)
-	var visible := model.view.knowledge.is_visible(tile)
+	var explored: bool = view_model.view.knowledge.is_explored(tile)
+	var visible: bool = view_model.view.knowledge.is_visible(tile)
 	info["explored"] = explored
 	info["visible"] = visible
 	if explored:
-		var data := model.view.board.get_tile(tile)
+		var data: BoardTileData = view_model.view.board.get_tile(tile)
 		if data != null:
 			info["terrain"] = TerrainRegistry.get_definition(data.terrain).display_name
 			info["bridge"] = data.has_bridge
-		for mine: GoldMine in state.gold_mines:
-			if mine.tile == tile:
-				info["mine"] = true
-				info["token"] = mine.gold_available and visible
-				break
-	var unit := model.view.get_unit_at(tile)
+		if online_mode:
+			info["mine"] = tile in view_model.explored_mine_tiles()
+			info["token"] = tile in view_model.visible_gold_token_tiles()
+		else:
+			for mine: GoldMine in state.gold_mines:
+				if mine.tile == tile:
+					info["mine"] = true
+					info["token"] = mine.gold_available and visible
+					break
+	var unit: GameUnit = view_model.view.get_unit_at(tile)
 	if unit != null:
-		info["unit"] = model.get_unit_info(unit.id)
+		info["unit"] = view_model.get_unit_info(unit.id)
 	return info
 
 
 func handle_back_request() -> bool:
+	if _online_overlay_visible:
+		return true
 	if _setup_visible:
 		_setup.handle_back()
+		return true
+	if _web_runtime_paused:
+		return true
+	if online_mode:
+		if online_model == null:
+			return true
+		if online_model.has_pending_promotion():
+			online_model.cancel_promotion()
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Promotion cancelled.")
+			return true
+		if _mobile_hud != null and _mobile_hud.is_recruit_sheet_open():
+			_mobile_hud.close_recruit_sheet()
+			return true
+		if online_model.recruitment_type() != -1 \
+				or online_model.bridge_mode() != PresentationModel.BridgeMode.NONE:
+			online_model.cancel_recruitment()
+			online_model.cancel_bridge_action()
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Mode cancelled.")
+			return true
+		if _mobile_hud != null and _mobile_hud.is_info_card_open():
+			_mobile_hud.close_info_card()
+			return true
+		if online_model.selected_tile != PresentationModel.NO_TILE \
+				or online_model.selected_unit_id != -1:
+			online_model.clear_selection()
+			_refresh_presentation(false)
+			if _hud != null:
+				_hud.set_status("Selection cleared.")
+			return true
+		if _mobile_hud != null and _mobile_hud.close_top_modal():
+			return true
 		return true
 	if model == null:
 		return false
@@ -1029,6 +2060,11 @@ func _notification(what: int) -> void:
 			or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if _touch_input != null:
 			_touch_input.cancel_gesture()
+		if PlatformMode.is_web_runtime():
+			_set_web_visibility_paused(true)
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		if PlatformMode.is_web_runtime():
+			_set_web_visibility_paused(false)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -1039,7 +2075,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_setup.handle_back()
 				get_viewport().set_input_as_handled()
 				return
-			if _input_locked or model == null:
+			if _input_locked or _web_runtime_paused or model == null:
 				return
 			model.cancel_recruitment()
 			model.cancel_bridge_action()

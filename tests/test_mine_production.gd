@@ -7,7 +7,7 @@ const MINE_A: Vector2i = Vector2i(5, 6)
 const MINE_B: Vector2i = Vector2i(10, 9)
 
 
-func test_occupied_mine_pays_after_four_actions() -> bool:
+func test_occupied_mine_pays_after_six_actions() -> bool:
 	var state := _terrain_state()
 	assert_not_null(state, "state built")
 	if state == null:
@@ -15,10 +15,10 @@ func test_occupied_mine_pays_after_four_actions() -> bool:
 	var mine := state.get_gold_mine_at(MINE_A)
 	MovementTestUtils.add_unit(state, UnitType.Type.ROOK, PLAYER_1, MINE_A)
 	var report := EconomyReport.new()
-	for step in range(1, 4):
+	for step in range(1, 6):
 		EconomySystem.advance_mines(state, report)
 		assert_eq(mine.cycle_progress, step, "cycle advances to %d" % step)
-		assert_eq(state.get_gold(PLAYER_1), 0, "no payout before four actions")
+		assert_eq(state.get_gold(PLAYER_1), 0, "no payout before six actions")
 		assert_false(mine.gold_available, "no token while occupied")
 	EconomySystem.advance_mines(state, report)
 	assert_eq(mine.cycle_progress, 0, "cycle resets after payout")
@@ -35,7 +35,7 @@ func test_unoccupied_mine_creates_one_token_and_pauses() -> bool:
 		return true
 	var mine := state.get_gold_mine_at(MINE_A)
 	var report := EconomyReport.new()
-	_advance(state, 4, report)
+	_advance(state, 6, report)
 	assert_true(mine.gold_available, "unoccupied mine creates a token")
 	assert_eq(mine.cycle_progress, 0, "cycle pauses at the token")
 	assert_eq(state.get_gold(PLAYER_1), 0, "no gold without an occupant")
@@ -56,7 +56,7 @@ func test_token_collection_resets_the_cycle() -> bool:
 	if state == null:
 		return true
 	var mine := state.get_gold_mine_at(MINE_A)
-	_advance(state, 4, EconomyReport.new())
+	_advance(state, 6, EconomyReport.new())
 	var unit := MovementTestUtils.add_unit(state, UnitType.Type.SCOUT, PLAYER_2, MINE_A)
 	var report := EconomyReport.new()
 	EconomySystem.collect_token(state, unit, report)
@@ -79,7 +79,7 @@ func test_owner_change_changes_the_recipient() -> bool:
 	if state == null:
 		return true
 	var p1_unit := MovementTestUtils.add_unit(state, UnitType.Type.ROOK, PLAYER_1, MINE_A)
-	_advance(state, 3, EconomyReport.new())
+	_advance(state, 5, EconomyReport.new())
 	MovementTestUtils.relocate_unit(state, p1_unit, Vector2i(4, 6))
 	MovementTestUtils.add_unit(state, UnitType.Type.ROOK, PLAYER_2, MINE_A)
 	EconomySystem.advance_mines(state, EconomyReport.new())
@@ -98,7 +98,7 @@ func test_mines_are_independent() -> bool:
 	MovementTestUtils.add_unit(state, UnitType.Type.ROOK, PLAYER_1, MINE_A)
 	MovementTestUtils.add_unit(state, UnitType.Type.ROOK, PLAYER_2, MINE_B)
 	var report := EconomyReport.new()
-	_advance(state, 4, report)
+	_advance(state, 6, report)
 	assert_eq(state.get_gold(PLAYER_1), 1, "player 1 mine pays")
 	assert_eq(state.get_gold(PLAYER_2), 1, "player 2 mine pays")
 	assert_eq(mine_a.cycle_progress, 0, "first mine resets")
@@ -130,6 +130,7 @@ func _terrain_state() -> GameState:
 		return null
 	var state := GameState.new(result.map)
 	MovementTestUtils.clear_units(state)
+	MovementTestUtils.clear_gold(state)
 	MovementTestUtils.reset_knowledge(state)
 	return state
 

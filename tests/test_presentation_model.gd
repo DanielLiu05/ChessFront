@@ -123,6 +123,7 @@ func test_recruitment_uses_known_spawn_tiles() -> bool:
 	assert_not_null(state, "state built")
 	if state == null:
 		return true
+	MovementTestUtils.clear_gold(state)
 	state.add_gold(PLAYER_1, 3)
 	var model := PresentationModel.new(state, PLAYER_1)
 	var options := model.available_recruitment_units()
@@ -314,7 +315,7 @@ func test_side_labels_and_winner_text() -> bool:
 	assert_eq(model.side_label(PLAYER_1), "You", "local legacy label")
 	assert_eq(model.side_label(PLAYER_2), "Player 2", "legacy opponent label")
 	assert_eq(model.short_side_label(PLAYER_2), "P2", "short legacy label")
-	assert_eq(model.gold_summary(), "Gold P1 0 · P2 0", "legacy gold summary")
+	assert_eq(model.gold_summary(), "Gold P1 2 · P2 2", "legacy gold summary")
 	state.game_over = true
 	state.winner = PLAYER_1
 	assert_eq(model.winner_text(), "Player 1 wins", "legacy winner text")
@@ -326,7 +327,7 @@ func test_side_labels_and_winner_text() -> bool:
 	assert_eq(ai_model.side_label(PLAYER_1), "You", "local AI-mode label")
 	assert_eq(ai_model.side_label(PLAYER_2), "AI", "AI opponent label")
 	assert_eq(ai_model.short_side_label(PLAYER_2), "AI", "short AI label")
-	assert_eq(ai_model.gold_summary(), "Gold You 0 · AI 0", "AI-mode gold summary")
+	assert_eq(ai_model.gold_summary(), "Gold You 2 · AI 2", "AI-mode gold summary")
 	state.winner = PLAYER_1
 	assert_eq(ai_model.winner_text(), "You win", "local AI-mode win")
 	state.winner = PLAYER_2

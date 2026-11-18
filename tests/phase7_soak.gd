@@ -2,7 +2,7 @@ extends SceneTree
 
 const PLAYER_1: int = GameConfig.Player.PLAYER_1
 const PLAYER_2: int = GameConfig.Player.PLAYER_2
-const DEFAULT_PLIES: int = 120
+const DEFAULT_PLIES: int = GameConfig.DEFAULT_TURN_LIMIT_PLIES
 const DEFAULT_PACE: float = 0.05
 
 var _failures: int = 0

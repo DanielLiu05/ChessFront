@@ -48,6 +48,8 @@ func _apply_insets() -> void:
 
 
 func _read_screen_insets() -> SafeInsets:
+	if PlatformMode.is_web_runtime():
+		return WebSafeArea.get_insets()
 	var window_size := DisplayServer.window_get_size()
 	if window_size.x <= 0 or window_size.y <= 0:
 		return SafeInsets.zero()
