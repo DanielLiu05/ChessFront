@@ -26,10 +26,16 @@ func setup() -> void:
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	position = Vector3(0.0, LAYER_HEIGHT, 0.0)
 	_current_image = Image.create(
-		WIDTH * STATE_TEXTURE_SCALE, HEIGHT * STATE_TEXTURE_SCALE, false, Image.FORMAT_R8
+		WIDTH * STATE_TEXTURE_SCALE,
+		HEIGHT * STATE_TEXTURE_SCALE,
+		false,
+		Image.FORMAT_RGBA8
 	)
 	_previous_image = Image.create(
-		WIDTH * STATE_TEXTURE_SCALE, HEIGHT * STATE_TEXTURE_SCALE, false, Image.FORMAT_R8
+		WIDTH * STATE_TEXTURE_SCALE,
+		HEIGHT * STATE_TEXTURE_SCALE,
+		false,
+		Image.FORMAT_RGBA8
 	)
 	_current_image.fill(Color(0.0, 0.0, 0.0, 1.0))
 	_previous_image.fill(Color(0.0, 0.0, 0.0, 1.0))
@@ -42,10 +48,26 @@ func setup() -> void:
 	_material.set_shader_parameter("reveal_progress", 1.0)
 	_material.set_shader_parameter("reveal_origin_uv", Vector2(0.5, 0.5))
 	_material.set_shader_parameter(
-		"fog_color", _vec3(PresentationConfig.PALETTE["unexplored"].darkened(0.45))
+		"fog_color",
+		shader_color(
+			PresentationConfig.PALETTE["unexplored"].darkened(0.45),
+			RenderingServer.get_current_rendering_method()
+		)
 	)
-	_material.set_shader_parameter("veil_color", _vec3(PresentationConfig.PALETTE["void"]))
-	_material.set_shader_parameter("grid_color", _vec3(PresentationConfig.PALETTE["void"]))
+	_material.set_shader_parameter(
+		"veil_color",
+		shader_color(
+			PresentationConfig.PALETTE["void"],
+			RenderingServer.get_current_rendering_method()
+		)
+	)
+	_material.set_shader_parameter(
+		"grid_color",
+		shader_color(
+			PresentationConfig.PALETTE["void"],
+			RenderingServer.get_current_rendering_method()
+		)
+	)
 	material_override = _material
 
 
@@ -73,7 +95,7 @@ func set_states(new_states: Dictionary[Vector2i, int]) -> void:
 			STATE_TEXTURE_SCALE,
 			STATE_TEXTURE_SCALE
 		)
-		_current_image.fill_rect(block, Color(value, 0.0, 0.0, 1.0))
+		_current_image.fill_rect(block, Color(value, value, value, 1.0))
 	_current_texture.update(_current_image)
 	_previous_texture.update(_previous_image)
 	if revealed.is_empty() or not is_inside_tree():
@@ -123,7 +145,11 @@ func _centroid_uv(tiles: Array[Vector2i]) -> Vector2:
 	return total / float(tiles.size())
 
 
-static func _vec3(color: Color) -> Vector3:
+static func shader_color(color: Color, rendering_method: String = "") -> Vector3:
+	# GL compatibility (Web, GLES) writes unshaded shader colours without the
+	# linear-to-sRGB conversion used by Vulkan, so send it sRGB directly.
+	if rendering_method == "gl_compatibility":
+		return Vector3(color.r, color.g, color.b)
 	var linear := color.srgb_to_linear()
 	return Vector3(linear.r, linear.g, linear.b)
 

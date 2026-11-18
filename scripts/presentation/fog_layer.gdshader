@@ -5,9 +5,9 @@ uniform sampler2D fog_current : filter_linear, repeat_disable;
 uniform sampler2D fog_previous : filter_linear, repeat_disable;
 uniform float reveal_progress : hint_range(0.0, 1.0) = 1.0;
 uniform vec2 reveal_origin_uv = vec2(0.5, 0.5);
-uniform vec3 fog_color : source_color = vec3(0.44, 0.49, 0.55);
-uniform vec3 veil_color : source_color = vec3(0.07, 0.10, 0.15);
-uniform vec3 grid_color : source_color = vec3(0.03, 0.04, 0.06);
+uniform vec3 fog_color = vec3(0.44, 0.49, 0.55);
+uniform vec3 veil_color = vec3(0.07, 0.10, 0.15);
+uniform vec3 grid_color = vec3(0.03, 0.04, 0.06);
 
 varying vec2 fog_uv;
 

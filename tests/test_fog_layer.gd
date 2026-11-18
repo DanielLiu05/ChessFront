@@ -49,3 +49,17 @@ func test_state_changes_update_coverage() -> bool:
 	assert_false(fog.is_revealing(), "no tween runs without a live tree")
 	fog.free()
 	return true
+
+
+func test_shader_colors_match_the_renderer() -> bool:
+	var color := Color(0.44, 0.49, 0.55)
+	var web := FogLayer.shader_color(color, "gl_compatibility")
+	assert_true(is_equal_approx(web.x, color.r), "web receives sRGB directly")
+	assert_true(is_equal_approx(web.z, color.b), "web blue is sRGB")
+	var desktop := FogLayer.shader_color(color, "forward_plus")
+	assert_true(
+		is_equal_approx(desktop.x, color.srgb_to_linear().r),
+		"Vulkan receives linear values"
+	)
+	assert_true(desktop.x < web.x, "linear values are darker before output conversion")
+	return true
